@@ -7,7 +7,6 @@ using Microsoft.Win32;
 using SNMP.Core.Enums;
 using SNMP.Core.Interfaces;
 using SNMP.Core.Models;
-using SNMP.Engine.Mib;
 using SNMP.Engine.Services;
 
 namespace SNMP.App.ViewModels;
@@ -15,20 +14,21 @@ namespace SNMP.App.ViewModels;
 public sealed class MainViewModel : INotifyPropertyChanged
 {
     // ── Services ─────────────────────────────────────────────────────────────
-    private readonly ISnmpClient        _client;
+    private readonly ISnmpClient         _client;
     private readonly INegotiationService _negotiation;
     private readonly IMibRepository      _mib;
     private readonly IOidTranslator      _translator;
     private readonly ILogService         _log;
     private readonly IExportService      _export;
 
-    // ── State ─────────────────────────────────────────────────────────────────
     private CancellationTokenSource? _cts;
 
-    // ── Bindable Properties ───────────────────────────────────────────────────
-    public ObservableCollection<SnmpResult> Results  { get; } = new();
-    public ObservableCollection<LogEntry>  LogEntries { get; } = new();
+    // ── Bindable collections ──────────────────────────────────────────────────
+    public ObservableCollection<SnmpResult>    Results      { get; } = new();
+    public ObservableCollection<LogEntry>      LogEntries   { get; } = new();
+    public ObservableCollection<MibModuleInfo> MibModules   { get; } = new();
 
+    // ── Connection ────────────────────────────────────────────────────────────
     private string _host = string.Empty;
     public string Host { get => _host; set => Set(ref _host, value); }
 
@@ -45,6 +45,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _rootOid = "1.3.6.1.2.1";
     public string RootOid { get => _rootOid; set => Set(ref _rootOid, value); }
 
+    // ── Status ────────────────────────────────────────────────────────────────
     private string _statusText = "Ready.";
     public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
 
@@ -60,7 +61,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private int _mibCount;
     public int MibCount { get => _mibCount; set => Set(ref _mibCount, value); }
 
-    // Write mode
+    // ── MIB Manager ───────────────────────────────────────────────────────────
+    private MibModuleInfo? _selectedModule;
+    public MibModuleInfo? SelectedModule
+    {
+        get => _selectedModule;
+        set { Set(ref _selectedModule, value); (RemoveModuleCommand as RelayCommand)?.RaiseCanExecuteChanged(); }
+    }
+
+    private string _mibDropHint = "Drag & drop MIB files here, or click Import MIB";
+    public string MibDropHint { get => _mibDropHint; set => Set(ref _mibDropHint, value); }
+
+    private bool _isDragOver;
+    public bool IsDragOver { get => _isDragOver; set => Set(ref _isDragOver, value); }
+
+    // ── Write mode ────────────────────────────────────────────────────────────
     private bool _writeModeEnabled;
     public bool WriteModeEnabled
     {
@@ -84,18 +99,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string SetValue { get => _setValue; set => Set(ref _setValue, value); }
 
     // ── Commands ──────────────────────────────────────────────────────────────
-    public ICommand WalkCommand       { get; }
-    public ICommand GetCommand        { get; }
-    public ICommand CancelCommand     { get; }
-    public ICommand NegotiateCommand  { get; }
-    public ICommand ImportMibCommand  { get; }
-    public ICommand ExportCsvCommand  { get; }
-    public ICommand ExportJsonCommand { get; }
-    public ICommand ExportBundleCommand { get; }
-    public ICommand SetCommand        { get; }
-    public ICommand ClearLogCommand   { get; }
+    public ICommand WalkCommand             { get; }
+    public ICommand GetCommand              { get; }
+    public ICommand CancelCommand           { get; }
+    public ICommand NegotiateCommand        { get; }
+    public ICommand ImportMibCommand        { get; }
+    public ICommand RemoveModuleCommand     { get; }
+    public ICommand ClearMibCacheCommand    { get; }
+    public ICommand ExportCsvCommand        { get; }
+    public ICommand ExportJsonCommand       { get; }
+    public ICommand ExportBundleCommand     { get; }
+    public ICommand SetCommand              { get; }
+    public ICommand ClearLogCommand         { get; }
     public ICommand PrinterQuickViewCommand { get; }
 
+    // ── Constructor ───────────────────────────────────────────────────────────
     public MainViewModel(ISnmpClient client, INegotiationService negotiation,
         IMibRepository mib, IOidTranslator translator, ILogService log, IExportService export)
     {
@@ -108,27 +126,50 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         _log.EntryAdded += entry => App.Current.Dispatcher.Invoke(() => LogEntries.Add(entry));
 
-        WalkCommand       = new RelayCommand(async () => await DoWalkAsync(),       () => !IsBusy);
-        GetCommand        = new RelayCommand(async () => await DoGetAsync(),        () => !IsBusy);
-        CancelCommand     = new RelayCommand(() => _cts?.Cancel(),                  () => IsBusy);
-        NegotiateCommand  = new RelayCommand(async () => await DoNegotiateAsync(), () => !IsBusy);
-        ImportMibCommand  = new RelayCommand(async () => await DoImportMibAsync());
-        ExportCsvCommand  = new RelayCommand(async () => await DoExportCsvAsync(),  () => Results.Count > 0);
-        ExportJsonCommand = new RelayCommand(async () => await DoExportJsonAsync(), () => Results.Count > 0);
-        ExportBundleCommand = new RelayCommand(async () => await DoExportBundleAsync());
-        SetCommand        = new RelayCommand(async () => await DoSetAsync(),        () => WriteModeEnabled && !IsBusy);
-        ClearLogCommand   = new RelayCommand(() => { _log.Clear(); LogEntries.Clear(); });
-        PrinterQuickViewCommand = new RelayCommand(async () => await DoPrinterQuickViewAsync(), () => !IsBusy);
+        WalkCommand             = new RelayCommand(async () => await DoWalkAsync(),              () => !IsBusy);
+        GetCommand              = new RelayCommand(async () => await DoGetAsync(),               () => !IsBusy);
+        CancelCommand           = new RelayCommand(() => _cts?.Cancel(),                         () => IsBusy);
+        NegotiateCommand        = new RelayCommand(async () => await DoNegotiateAsync(),         () => !IsBusy);
+        ImportMibCommand        = new RelayCommand(async () => await DoImportMibAsync());
+        RemoveModuleCommand     = new RelayCommand(async () => await DoRemoveModuleAsync(),      () => SelectedModule != null);
+        ClearMibCacheCommand    = new RelayCommand(async () => await DoClearMibCacheAsync());
+        ExportCsvCommand        = new RelayCommand(async () => await DoExportCsvAsync(),         () => Results.Count > 0);
+        ExportJsonCommand       = new RelayCommand(async () => await DoExportJsonAsync(),        () => Results.Count > 0);
+        ExportBundleCommand     = new RelayCommand(async () => await DoExportBundleAsync());
+        SetCommand              = new RelayCommand(async () => await DoSetAsync(),               () => WriteModeEnabled && !IsBusy);
+        ClearLogCommand         = new RelayCommand(() => { _log.Clear(); LogEntries.Clear(); });
+        PrinterQuickViewCommand = new RelayCommand(async () => await DoPrinterQuickViewAsync(),  () => !IsBusy);
+
+        // Load cache on startup (fire-and-forget — UI will update via MibCount)
+        _ = LoadCacheOnStartupAsync();
+    }
+
+    // ── Startup cache load ────────────────────────────────────────────────────
+    private async Task LoadCacheOnStartupAsync()
+    {
+        StatusText = "Loading MIB cache…";
+        var count = await _mib.LoadCacheAsync();
+        RefreshMibModules();
+        MibCount = _mib.Count;
+        if (count > 0)
+        {
+            StatusText = $"MIB cache restored — {count} nodes across {MibModules.Count} modules. Ready.";
+            _log.Info($"MIB cache loaded: {count} nodes, {MibModules.Count} modules.");
+        }
+        else
+        {
+            StatusText = "Ready. No MIB cache found — import MIB files to enable OID translation.";
+        }
     }
 
     // ── Walk ─────────────────────────────────────────────────────────────────
     private async Task DoWalkAsync()
     {
         Results.Clear(); OidCount = 0;
-        IsBusy = true; _cts = new CancellationTokenSource();
+        IsBusy = true;
+        _cts   = new CancellationTokenSource();
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        // Timer for elapsed display
         var timer = new System.Timers.Timer(500);
         timer.Elapsed += (_, _) => Elapsed = $"{sw.Elapsed:mm\\:ss}";
         timer.Start();
@@ -155,9 +196,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     // ── GET ──────────────────────────────────────────────────────────────────
     private async Task DoGetAsync()
     {
-        IsBusy = true; _cts = new CancellationTokenSource();
-        var target = BuildTarget();
-        var (result, error) = await _client.GetAsync(target, RootOid, _cts.Token);
+        IsBusy = true;
+        _cts   = new CancellationTokenSource();
+        var (result, error) = await _client.GetAsync(BuildTarget(), RootOid, _cts.Token);
         if (result != null) { Enrich(result); Results.Add(result); OidCount++; StatusText = "GET succeeded."; }
         else StatusText = $"GET failed: {error}";
         IsBusy = false;
@@ -167,9 +208,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private async Task DoNegotiateAsync()
     {
         IsBusy = true; StatusText = "Auto-negotiating…";
-        _cts = new CancellationTokenSource();
+        _cts   = new CancellationTokenSource();
         var report = await _negotiation.NegotiateAsync(Host, Port, ct: _cts.Token);
-
         foreach (var a in report.AttemptLog) _log.Debug(a);
 
         if (report.Success)
@@ -187,23 +227,77 @@ public sealed class MainViewModel : INotifyPropertyChanged
         IsBusy = false;
     }
 
-    // ── Import MIB ───────────────────────────────────────────────────────────
+    // ── Import MIB (file picker) ──────────────────────────────────────────────
     private async Task DoImportMibAsync()
     {
         var dlg = new OpenFileDialog
         {
-            Title      = "Import MIB Files",
+            Title       = "Import MIB Files",
             Multiselect = true,
-            Filter     = "MIB files|*.mib;*.txt;*.my;*.*|All files|*.*"
+            Filter      = "MIB files|*.mib;*.txt;*.my|All files|*.*"
         };
         if (dlg.ShowDialog() != true) return;
+        await ImportFilesAsync(dlg.FileNames);
+    }
 
-        StatusText = "Importing MIBs…";
-        var (loaded, failed, errors) = await _mib.ImportAsync(dlg.FileNames);
+    // ── Import MIB (drag-drop) — called from code-behind ─────────────────────
+    public async Task HandleDroppedFilesAsync(IEnumerable<string> paths)
+    {
+        IsDragOver = false;
+        await ImportFilesAsync(paths);
+    }
+
+    public void SetDragOver(bool over) => IsDragOver = over;
+
+    private async Task ImportFilesAsync(IEnumerable<string> paths)
+    {
+        var pathList = paths.ToList();
+        StatusText = $"Importing {pathList.Count} MIB file(s)…";
+        _log.Info($"MIB import started: {pathList.Count} file(s)");
+
+        var (loaded, failed, errors) = await _mib.ImportAsync(pathList);
+
+        RefreshMibModules();
         MibCount = _mib.Count;
-        StatusText = $"MIBs loaded: {loaded} nodes, {failed} files failed.";
-        foreach (var e in errors) _log.Warn($"MIB parse error: {e}");
-        _log.Info($"MIB import: {loaded} nodes from {dlg.FileNames.Length} files.");
+
+        StatusText = loaded > 0
+            ? $"MIB import done — {loaded} nodes added, {_mib.Count} total. {(failed > 0 ? $"{failed} file(s) failed." : "")}"
+            : $"MIB import: no nodes parsed. {(failed > 0 ? $"{failed} file(s) failed." : "Check file format.")}";
+
+        foreach (var e in errors) _log.Warn($"MIB parse: {e}");
+        _log.Info($"MIB import complete: {loaded} nodes from {pathList.Count} file(s), cache updated.");
+    }
+
+    // ── Remove module ─────────────────────────────────────────────────────────
+    private async Task DoRemoveModuleAsync()
+    {
+        if (SelectedModule == null) return;
+        var name = SelectedModule.ModuleName;
+
+        if (MessageBox.Show($"Remove module '{name}' and all its OID mappings?",
+                "Remove Module", MessageBoxButton.OKCancel, MessageBoxImage.Question)
+            != MessageBoxResult.OK) return;
+
+        await _mib.RemoveModuleAsync(name);
+        RefreshMibModules();
+        MibCount = _mib.Count;
+        SelectedModule = null;
+        StatusText = $"Module '{name}' removed. {_mib.Count} nodes remaining.";
+        _log.Info($"MIB module removed: {name}");
+    }
+
+    // ── Clear all MIB cache ───────────────────────────────────────────────────
+    private async Task DoClearMibCacheAsync()
+    {
+        if (MessageBox.Show("This will clear ALL loaded MIB modules and delete the cache.\nYou will need to re-import MIB files.",
+                "Clear MIB Cache?", MessageBoxButton.OKCancel, MessageBoxImage.Warning)
+            != MessageBoxResult.OK) return;
+
+        await _mib.ClearAllAsync();
+        RefreshMibModules();
+        MibCount = 0;
+        StatusText = "MIB cache cleared.";
+        _log.Info("MIB cache cleared by user.");
     }
 
     // ── Exports ───────────────────────────────────────────────────────────────
@@ -227,9 +321,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private async Task DoExportBundleAsync()
     {
-        var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Select output folder for diagnostics bundle" };
+        var dlg = new System.Windows.Forms.FolderBrowserDialog
+            { Description = "Select output folder for diagnostics bundle" };
         if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-        var path = await _export.ExportDiagnosticsBundleAsync(Results, _log.Entries, BuildTarget(), dlg.SelectedPath);
+        var path = await _export.ExportDiagnosticsBundleAsync(
+            Results, _log.Entries, BuildTarget(), dlg.SelectedPath);
         _log.Info($"Diagnostics bundle: {path}");
         StatusText = $"Bundle saved to: {path}";
     }
@@ -238,9 +334,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private async Task DoSetAsync()
     {
         if (!WriteModeEnabled) return;
-        if (string.IsNullOrWhiteSpace(SetOid) || string.IsNullOrWhiteSpace(SetValue)) { StatusText = "SET requires OID and value."; return; }
+        if (string.IsNullOrWhiteSpace(SetOid) || string.IsNullOrWhiteSpace(SetValue))
+        { StatusText = "SET requires OID and value."; return; }
 
-        IsBusy = true; _cts = new CancellationTokenSource();
+        IsBusy = true;
+        _cts   = new CancellationTokenSource();
         var (ok, err) = await _client.SetAsync(BuildTarget(), SetOid, SetType, SetValue, _cts.Token);
         StatusText = ok ? $"SET succeeded: {SetOid}" : $"SET failed: {err}";
         IsBusy = false;
@@ -250,10 +348,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private async Task DoPrinterQuickViewAsync()
     {
         Results.Clear(); OidCount = 0;
-        IsBusy = true; _cts = new CancellationTokenSource();
+        IsBusy = true;
+        _cts   = new CancellationTokenSource();
         StatusText = "Printer Quick View…";
 
-        // Standard printer OIDs to query
         var printerOids = new[]
         {
             "1.3.6.1.2.1.1.5.0",            // sysName
@@ -276,7 +374,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (_cts.Token.IsCancellationRequested) break;
             var (r, _) = await _client.GetAsync(target, oid, _cts.Token);
-            if (r != null) { Enrich(r); App.Current.Dispatcher.Invoke(() => { Results.Add(r); OidCount++; }); }
+            if (r != null)
+            {
+                Enrich(r);
+                App.Current.Dispatcher.Invoke(() => { Results.Add(r); OidCount++; });
+            }
         }
 
         StatusText = $"Printer Quick View done — {OidCount} OIDs.";
@@ -285,13 +387,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private void RefreshMibModules()
+    {
+        App.Current.Dispatcher.Invoke(() =>
+        {
+            MibModules.Clear();
+            foreach (var m in _mib.LoadedModules)
+                MibModules.Add(m);
+        });
+    }
+
     private SnmpTarget BuildTarget() => new()
     {
-        Host      = Host,
-        Port      = Port,
-        Version   = Version,
-        Community = Community,
-        WriteCommunity = Community // user can override in a future settings pane
+        Host           = Host,
+        Port           = Port,
+        Version        = Version,
+        Community      = Community,
+        WriteCommunity = Community
     };
 
     private void Enrich(SnmpResult r)
@@ -304,11 +416,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void RaiseCommandsChanged()
     {
-        (WalkCommand as RelayCommand)?.RaiseCanExecuteChanged();
-        (GetCommand  as RelayCommand)?.RaiseCanExecuteChanged();
-        (CancelCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (WalkCommand      as RelayCommand)?.RaiseCanExecuteChanged();
+        (GetCommand       as RelayCommand)?.RaiseCanExecuteChanged();
+        (CancelCommand    as RelayCommand)?.RaiseCanExecuteChanged();
         (NegotiateCommand as RelayCommand)?.RaiseCanExecuteChanged();
-        (SetCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (SetCommand       as RelayCommand)?.RaiseCanExecuteChanged();
+        (PrinterQuickViewCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }
 
     // ── INotifyPropertyChanged ────────────────────────────────────────────────

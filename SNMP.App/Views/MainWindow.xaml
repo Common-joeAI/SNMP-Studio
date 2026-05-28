@@ -5,11 +5,17 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="SNMP Studio v1.0 — Network Device Browser"
-        Height="820" Width="1280" MinHeight="600" MinWidth="900"
-        Background="#F0F2F5">
+        Height="860" Width="1340" MinHeight="640" MinWidth="960"
+        Background="#F0F2F5"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        DragLeave="Window_DragLeave"
+        Drop="Window_Drop">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolVis"/>
+
+        <!-- Invert bool → visibility (for drop hint when NOT dragging) -->
         <Style TargetType="Button" x:Key="PrimaryBtn">
             <Setter Property="Background" Value="#0A2D6E"/>
             <Setter Property="Foreground" Value="White"/>
@@ -36,11 +42,16 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
         <Style TargetType="Button" x:Key="DangerBtn" BasedOn="{StaticResource PrimaryBtn}">
             <Setter Property="Background" Value="#C0392B"/>
         </Style>
         <Style TargetType="Button" x:Key="WarnBtn" BasedOn="{StaticResource PrimaryBtn}">
             <Setter Property="Background" Value="#D4800A"/>
+        </Style>
+        <Style TargetType="Button" x:Key="SmallBtn" BasedOn="{StaticResource PrimaryBtn}">
+            <Setter Property="Padding"   Value="8,3"/>
+            <Setter Property="FontSize"  Value="11"/>
         </Style>
         <Style TargetType="TextBox" x:Key="InputBox">
             <Setter Property="Padding" Value="6,4"/>
@@ -62,9 +73,12 @@
                            Foreground="White" VerticalAlignment="Center"/>
                 <TextBlock Text=" v1.0" FontSize="14" Foreground="#7AABFF"
                            VerticalAlignment="Bottom" Margin="0,0,0,2"/>
-                <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center"
-                           Foreground="#AACCFF" FontSize="12"
-                           Text="{Binding MibCount, StringFormat='MIB nodes: {0}'}"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Foreground="#AACCFF" FontSize="12" VerticalAlignment="Center"
+                               Text="{Binding MibModules.Count, StringFormat='Modules: {0}  '}"/>
+                    <TextBlock Foreground="#AACCFF" FontSize="12" VerticalAlignment="Center"
+                               Text="{Binding MibCount, StringFormat='Nodes: {0}'}"/>
+                </StackPanel>
             </DockPanel>
         </Border>
 
@@ -73,6 +87,14 @@
                 Visibility="{Binding WriteModeEnabled, Converter={StaticResource BoolVis}}">
             <TextBlock Text="⚠  WRITE MODE ENABLED — SET operations are active. Use with caution."
                        Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- ── Drag-Over Overlay ─────────────────────────────────────────── -->
+        <Border DockPanel.Dock="Top" Background="#1A5276" Padding="12,10"
+                Visibility="{Binding IsDragOver, Converter={StaticResource BoolVis}}">
+            <TextBlock Text="📂  Drop MIB files here to import"
+                       Foreground="White" FontWeight="Bold" FontSize="14"
+                       HorizontalAlignment="Center"/>
         </Border>
 
         <!-- ── Status Bar ────────────────────────────────────────────────── -->
@@ -95,9 +117,9 @@
         <!-- ── Main Content ───────────────────────────────────────────────── -->
         <Grid Margin="12">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>  <!-- Connection panel -->
-                <RowDefinition Height="Auto"/>  <!-- Action bar -->
-                <RowDefinition Height="*"/>     <!-- Results + logs splitter -->
+                <RowDefinition Height="Auto"/>   <!-- Connection panel -->
+                <RowDefinition Height="Auto"/>   <!-- Action bar -->
+                <RowDefinition Height="*"/>      <!-- Tab content -->
             </Grid.RowDefinitions>
 
             <!-- ── Connection Panel ──────────────────────────────────────── -->
@@ -106,10 +128,12 @@
                     BorderBrush="#DDDDDD" BorderThickness="1">
                 <WrapPanel>
                     <Label Content="Host:" Style="{StaticResource FieldLabel}" Margin="0,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="180" Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Style="{StaticResource InputBox}" Width="180"
+                             Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <Label Content="Port:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="60"  Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Style="{StaticResource InputBox}" Width="60"
+                             Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <Label Content="Version:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
                     <ComboBox Width="80" ItemsSource="{Binding Versions}"
@@ -117,10 +141,12 @@
                               Padding="6,4" VerticalContentAlignment="Center"/>
 
                     <Label Content="Community:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="120" Text="{Binding Community, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Style="{StaticResource InputBox}" Width="120"
+                             Text="{Binding Community, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <Label Content="Root OID:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="200" Text="{Binding RootOid, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Style="{StaticResource InputBox}" Width="200"
+                             Text="{Binding RootOid, UpdateSourceTrigger=PropertyChanged}"/>
 
                     <Button Content="Auto-Detect" Style="{StaticResource WarnBtn}" Margin="12,0,0,0"
                             Command="{Binding NegotiateCommand}"/>
@@ -132,27 +158,25 @@
                     Padding="14,10" Margin="0,0,0,8"
                     BorderBrush="#DDDDDD" BorderThickness="1">
                 <WrapPanel>
-                    <Button Content="▶ Walk"        Style="{StaticResource PrimaryBtn}" Command="{Binding WalkCommand}"       Margin="0,0,8,0"/>
-                    <Button Content="⤓ GET"          Style="{StaticResource PrimaryBtn}" Command="{Binding GetCommand}"        Margin="0,0,8,0"/>
-                    <Button Content="✕ Cancel"       Style="{StaticResource DangerBtn}"  Command="{Binding CancelCommand}"     Margin="0,0,16,0"/>
-                    <Button Content="🖨 Printer View" Style="{StaticResource PrimaryBtn}" Command="{Binding PrinterQuickViewCommand}" Margin="0,0,16,0"/>
-                    <Button Content="Import MIB"    Style="{StaticResource PrimaryBtn}" Command="{Binding ImportMibCommand}"  Margin="0,0,8,0"/>
-                    <Button Content="Export CSV"    Style="{StaticResource PrimaryBtn}" Command="{Binding ExportCsvCommand}"  Margin="0,0,8,0"/>
-                    <Button Content="Export JSON"   Style="{StaticResource PrimaryBtn}" Command="{Binding ExportJsonCommand}" Margin="0,0,8,0"/>
-                    <Button Content="📦 Diagnostics Bundle" Style="{StaticResource WarnBtn}" Command="{Binding ExportBundleCommand}" Margin="0,0,16,0"/>
+                    <Button Content="▶ Walk"         Style="{StaticResource PrimaryBtn}" Command="{Binding WalkCommand}"             Margin="0,0,8,0"/>
+                    <Button Content="⤓ GET"           Style="{StaticResource PrimaryBtn}" Command="{Binding GetCommand}"              Margin="0,0,8,0"/>
+                    <Button Content="✕ Cancel"        Style="{StaticResource DangerBtn}"  Command="{Binding CancelCommand}"           Margin="0,0,16,0"/>
+                    <Button Content="🖨 Printer View"  Style="{StaticResource PrimaryBtn}" Command="{Binding PrinterQuickViewCommand}" Margin="0,0,16,0"/>
+                    <Button Content="Export CSV"     Style="{StaticResource PrimaryBtn}" Command="{Binding ExportCsvCommand}"        Margin="0,0,8,0"/>
+                    <Button Content="Export JSON"    Style="{StaticResource PrimaryBtn}" Command="{Binding ExportJsonCommand}"       Margin="0,0,8,0"/>
+                    <Button Content="📦 Diag Bundle" Style="{StaticResource WarnBtn}"    Command="{Binding ExportBundleCommand}"     Margin="0,0,16,0"/>
 
-                    <!-- Write mode toggle -->
-                    <CheckBox Content="Enable Write Mode" IsChecked="{Binding WriteModeEnabled}"
+                    <CheckBox Content="Write Mode" IsChecked="{Binding WriteModeEnabled}"
                               VerticalAlignment="Center" Margin="0,0,12,0"
                               Foreground="#C0392B" FontWeight="SemiBold"/>
 
-                    <!-- SET fields (only visible in write mode) -->
+                    <!-- SET fields (write mode only) -->
                     <StackPanel Orientation="Horizontal"
                                 Visibility="{Binding WriteModeEnabled, Converter={StaticResource BoolVis}}">
                         <TextBox Style="{StaticResource InputBox}" Width="180" Text="{Binding SetOid}"
-                                 ToolTip="OID to SET" Margin="0,0,4,0" Tag="OID"/>
-                        <ComboBox Width="90" SelectedValue="{Binding SetType}" Padding="6,4"
-                                  VerticalContentAlignment="Center" Margin="0,0,4,0">
+                                 ToolTip="OID to SET" Margin="0,0,4,0"/>
+                        <ComboBox Width="90" SelectedValue="{Binding SetType}"
+                                  Padding="6,4" VerticalContentAlignment="Center" Margin="0,0,4,0">
                             <ComboBoxItem Content="INTEGER"/>
                             <ComboBoxItem Content="STRING"/>
                             <ComboBoxItem Content="OID"/>
@@ -161,76 +185,167 @@
                             <ComboBoxItem Content="COUNTER"/>
                         </ComboBox>
                         <TextBox Style="{StaticResource InputBox}" Width="140" Text="{Binding SetValue}"
-                                 ToolTip="Value to set" Margin="0,0,4,0"/>
+                                 ToolTip="Value" Margin="0,0,4,0"/>
                         <Button Content="SET" Style="{StaticResource DangerBtn}" Command="{Binding SetCommand}"/>
                     </StackPanel>
                 </WrapPanel>
             </Border>
 
-            <!-- ── Results + Log Pane ─────────────────────────────────────── -->
-            <Grid Grid.Row="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="3*"/>
-                    <RowDefinition Height="5"/>
-                    <RowDefinition Height="1*" MinHeight="80"/>
-                </Grid.RowDefinitions>
+            <!-- ── Tabs ───────────────────────────────────────────────────── -->
+            <TabControl Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1">
 
-                <!-- Results grid (virtualized) -->
-                <Border Grid.Row="0" Background="White" CornerRadius="6"
-                        BorderBrush="#DDDDDD" BorderThickness="1">
-                    <DataGrid ItemsSource="{Binding Results}"
-                              AutoGenerateColumns="False" IsReadOnly="True"
-                              VirtualizingPanel.IsVirtualizing="True"
-                              VirtualizingPanel.VirtualizationMode="Recycling"
-                              EnableRowVirtualization="True"
-                              CanUserSortColumns="True"
-                              GridLinesVisibility="Horizontal"
-                              AlternatingRowBackground="#F8F9FB"
-                              RowBackground="White"
-                              FontSize="12"
-                              BorderThickness="0">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="OID"           Binding="{Binding Oid}"          Width="200"/>
-                            <DataGridTextColumn Header="Symbolic Name" Binding="{Binding SymbolicName}" Width="180"/>
-                            <DataGridTextColumn Header="Raw Value"     Binding="{Binding RawValue}"     Width="160"/>
-                            <DataGridTextColumn Header="Human Value"   Binding="{Binding HumanValue}"   Width="200"/>
-                            <DataGridTextColumn Header="Type"          Binding="{Binding Type}"         Width="110"/>
-                            <DataGridTextColumn Header="Description"   Binding="{Binding Description}"  Width="*"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Border>
+                <!-- ══ Results Tab ════════════════════════════════════════════ -->
+                <TabItem Header="Results">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="3*"/>
+                            <RowDefinition Height="5"/>
+                            <RowDefinition Height="1*" MinHeight="80"/>
+                        </Grid.RowDefinitions>
 
-                <!-- Splitter -->
-                <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"
-                              Background="#CCCCCC" ShowsPreview="True"/>
+                        <!-- Results grid -->
+                        <Border Grid.Row="0" Background="White">
+                            <DataGrid ItemsSource="{Binding Results}"
+                                      AutoGenerateColumns="False" IsReadOnly="True"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      EnableRowVirtualization="True"
+                                      CanUserSortColumns="True"
+                                      GridLinesVisibility="Horizontal"
+                                      AlternatingRowBackground="#F8F9FB"
+                                      RowBackground="White"
+                                      FontSize="12" BorderThickness="0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="OID"           Binding="{Binding Oid}"          Width="200"/>
+                                    <DataGridTextColumn Header="Symbolic Name" Binding="{Binding SymbolicName}" Width="180"/>
+                                    <DataGridTextColumn Header="Raw Value"     Binding="{Binding RawValue}"     Width="150"/>
+                                    <DataGridTextColumn Header="Human Value"   Binding="{Binding HumanValue}"   Width="190"/>
+                                    <DataGridTextColumn Header="Type"          Binding="{Binding Type}"         Width="100"/>
+                                    <DataGridTextColumn Header="Description"   Binding="{Binding Description}"  Width="*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
 
-                <!-- Log Pane -->
-                <Border Grid.Row="2" Background="#1E1E2E" CornerRadius="6"
-                        BorderBrush="#444466" BorderThickness="1">
-                    <DockPanel>
-                        <DockPanel DockPanel.Dock="Top" Background="#2A2A3E" LastChildFill="False">
-                            <TextBlock Text="Diagnostics Log" Foreground="#AABBFF"
-                                       FontWeight="SemiBold" Padding="10,6" FontSize="12"/>
-                            <Button DockPanel.Dock="Right" Content="Clear" Margin="8,4"
-                                    Style="{StaticResource DangerBtn}" FontSize="11"
-                                    Command="{Binding ClearLogCommand}"/>
-                        </DockPanel>
-                        <ListBox ItemsSource="{Binding LogEntries}"
-                                 Background="Transparent" BorderThickness="0"
-                                 VirtualizingPanel.IsVirtualizing="True"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 Padding="6">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock FontFamily="Consolas" FontSize="11"
-                                               Text="{Binding}" Foreground="#CCDDFF"
-                                               TextWrapping="Wrap"/>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </DockPanel>
-                </Border>
-            </Grid>
+                        <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"
+                                      Background="#CCCCCC" ShowsPreview="True"/>
+
+                        <!-- Log pane -->
+                        <Border Grid.Row="2" Background="#1E1E2E" CornerRadius="0,0,4,4"
+                                BorderBrush="#444466" BorderThickness="0,1,0,0">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top" Background="#2A2A3E" LastChildFill="False">
+                                    <TextBlock Text="Diagnostics Log" Foreground="#AABBFF"
+                                               FontWeight="SemiBold" Padding="10,6" FontSize="12"/>
+                                    <Button DockPanel.Dock="Right" Content="Clear" Margin="8,4"
+                                            Style="{StaticResource DangerBtn}" FontSize="11"
+                                            Command="{Binding ClearLogCommand}"/>
+                                </DockPanel>
+                                <ListBox ItemsSource="{Binding LogEntries}"
+                                         Background="Transparent" BorderThickness="0"
+                                         VirtualizingPanel.IsVirtualizing="True"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         Padding="6">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock FontFamily="Consolas" FontSize="11"
+                                                       Text="{Binding}" Foreground="#CCDDFF"
+                                                       TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <!-- ══ MIB Manager Tab ════════════════════════════════════════ -->
+                <TabItem Header="MIB Manager">
+                    <Grid Margin="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>  <!-- Toolbar -->
+                            <RowDefinition Height="Auto"/>  <!-- Drop zone -->
+                            <RowDefinition Height="*"/>     <!-- Module list -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Toolbar -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                            <Button Content="📂 Import MIB File(s)" Style="{StaticResource PrimaryBtn}"
+                                    Command="{Binding ImportMibCommand}" Margin="0,0,8,0"/>
+                            <Button Content="🗑 Remove Selected" Style="{StaticResource DangerBtn}"
+                                    Command="{Binding RemoveModuleCommand}" Margin="0,0,8,0"/>
+                            <Button Content="⬛ Clear All Cache" Style="{StaticResource WarnBtn}"
+                                    Command="{Binding ClearMibCacheCommand}"/>
+                            <TextBlock VerticalAlignment="Center" Margin="16,0,0,0"
+                                       Foreground="#555555" FontSize="12"
+                                       Text="{Binding MibCount, StringFormat='Total nodes in memory: {0}'}"/>
+                        </StackPanel>
+
+                        <!-- Drag-drop zone -->
+                        <Border Grid.Row="1" Margin="0,0,0,10" CornerRadius="6"
+                                BorderThickness="2" Padding="20,16"
+                                HorizontalAlignment="Stretch">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background"   Value="#F8F9FB"/>
+                                    <Setter Property="BorderBrush"  Value="#AABBCC"/>
+                                    <Setter Property="BorderThickness" Value="2"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDragOver}" Value="True">
+                                            <Setter Property="Background"  Value="#D6EAF8"/>
+                                            <Setter Property="BorderBrush" Value="#2980B9"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="📂" FontSize="28" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Drag &amp; drop MIB files or folders here"
+                                           FontSize="14" FontWeight="SemiBold"
+                                           Foreground="#2C3E50" HorizontalAlignment="Center"
+                                           Margin="0,6,0,2"/>
+                                <TextBlock Text="Supports .mib  .my  .txt — HP, Cisco, Xerox, Ricoh, Kyocera, and more"
+                                           FontSize="11" Foreground="#7F8C8D"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="MIBs are parsed once and cached to %APPDATA%\SNMPStudio — instant on next launch"
+                                           FontSize="11" Foreground="#7F8C8D"
+                                           HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Module list -->
+                        <Border Grid.Row="2" Background="White" CornerRadius="6"
+                                BorderBrush="#DDDDDD" BorderThickness="1">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Background="#F0F4FA"
+                                        BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="10,6">
+                                    <TextBlock FontWeight="SemiBold" FontSize="12" Foreground="#2C3E50"
+                                               Text="{Binding MibModules.Count, StringFormat='Loaded Modules ({0})'}"/>
+                                </Border>
+                                <DataGrid ItemsSource="{Binding MibModules}"
+                                          SelectedItem="{Binding SelectedModule}"
+                                          AutoGenerateColumns="False" IsReadOnly="True"
+                                          GridLinesVisibility="Horizontal"
+                                          AlternatingRowBackground="#F8F9FB"
+                                          RowBackground="White"
+                                          CanUserSortColumns="True"
+                                          FontSize="12" BorderThickness="0"
+                                          SelectionMode="Single">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Module Name" Binding="{Binding ModuleName}" Width="220"/>
+                                        <DataGridTextColumn Header="Nodes"       Binding="{Binding NodeCount}"  Width="80"/>
+                                        <DataGridTextColumn Header="Source"      Binding="{Binding Summary}"    Width="130"/>
+                                        <DataGridTextColumn Header="Source Path" Binding="{Binding SourcePath}" Width="*"/>
+                                        <DataGridTextColumn Header="Imported"
+                                                            Binding="{Binding ImportedAt, StringFormat='yyyy-MM-dd HH:mm'}"
+                                                            Width="140"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+            </TabControl>
         </Grid>
     </DockPanel>
 </Window>
