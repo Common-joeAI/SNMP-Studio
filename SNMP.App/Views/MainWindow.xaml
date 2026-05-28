@@ -4,38 +4,60 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="SNMP Studio v1.0 — Network Device Browser"
-        Height="860" Width="1340" MinHeight="640" MinWidth="960"
-        Background="#F0F2F5"
+        Title="SNMP Studio"
+        Height="880" Width="1400" MinHeight="660" MinWidth="1000"
+        WindowStartupLocation="CenterScreen"
+        Background="#0F1117"
         AllowDrop="True"
         DragOver="Window_DragOver"
         DragLeave="Window_DragLeave"
         Drop="Window_Drop">
 
     <Window.Resources>
+
+        <!-- ── Colours ──────────────────────────────────────────────────── -->
+        <SolidColorBrush x:Key="BgBase"       Color="#0F1117"/>
+        <SolidColorBrush x:Key="BgSurface"    Color="#181C27"/>
+        <SolidColorBrush x:Key="BgCard"       Color="#1E2235"/>
+        <SolidColorBrush x:Key="BgHover"      Color="#252A3D"/>
+        <SolidColorBrush x:Key="AccentBlue"   Color="#4F8EF7"/>
+        <SolidColorBrush x:Key="AccentPurple" Color="#7C6CF8"/>
+        <SolidColorBrush x:Key="AccentRed"    Color="#E05260"/>
+        <SolidColorBrush x:Key="AccentAmber"  Color="#F59E0B"/>
+        <SolidColorBrush x:Key="AccentGreen"  Color="#34D399"/>
+        <SolidColorBrush x:Key="TextPrimary"  Color="#F1F3F9"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#8B92A8"/>
+        <SolidColorBrush x:Key="Border"       Color="#2A2F45"/>
+
         <BooleanToVisibilityConverter x:Key="BoolVis"/>
 
-        <!-- Invert bool → visibility (for drop hint when NOT dragging) -->
-        <Style TargetType="Button" x:Key="PrimaryBtn">
-            <Setter Property="Background" Value="#0A2D6E"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding"    Value="12,5"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
+        <!-- ── Flat pill button ──────────────────────────────────────────── -->
+        <Style x:Key="PillBtn" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor"     Value="Hand"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4"
+                        <Border x:Name="bg" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1A4D9E"/>
+                                <Setter TargetName="bg" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.7"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#AABBCC"/>
+                                <Setter TargetName="bg" Property="Opacity" Value="0.35"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -43,309 +65,564 @@
             </Setter>
         </Style>
 
-        <Style TargetType="Button" x:Key="DangerBtn" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background" Value="#C0392B"/>
+        <Style x:Key="RedBtn"   BasedOn="{StaticResource PillBtn}" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentRed}"/>
         </Style>
-        <Style TargetType="Button" x:Key="WarnBtn" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Background" Value="#D4800A"/>
+        <Style x:Key="AmberBtn" BasedOn="{StaticResource PillBtn}" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentAmber}"/>
+            <Setter Property="Foreground" Value="#1A1A1A"/>
         </Style>
-        <Style TargetType="Button" x:Key="SmallBtn" BasedOn="{StaticResource PrimaryBtn}">
-            <Setter Property="Padding"   Value="8,3"/>
-            <Setter Property="FontSize"  Value="11"/>
+        <Style x:Key="GhostBtn" BasedOn="{StaticResource PillBtn}" TargetType="Button">
+            <Setter Property="Background" Value="#2A2F45"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
         </Style>
-        <Style TargetType="TextBox" x:Key="InputBox">
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+
+        <!-- ── Modern TextBox ────────────────────────────────────────────── -->
+        <Style x:Key="ModernInput" TargetType="TextBox">
+            <Setter Property="Background" Value="#252A3D"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBlue}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="bd" CornerRadius="5"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush"
+                                        Value="{StaticResource AccentBlue}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <Style TargetType="Label" x:Key="FieldLabel">
+
+        <!-- ── Modern ComboBox ───────────────────────────────────────────── -->
+        <Style x:Key="ModernCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="#252A3D"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <!-- ── Field label ───────────────────────────────────────────────── -->
+        <Style x:Key="FieldLbl" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize"   Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#333333"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="TextTransform" Value="Uppercase"/>
         </Style>
+
+        <!-- ── Sidebar nav button ────────────────────────────────────────── -->
+        <Style x:Key="NavBtn" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="GroupName" Value="Nav"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bg" CornerRadius="8" Margin="4,2"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="icon" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#252A3D"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#1E2235"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── Card border ───────────────────────────────────────────────── -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource BgCard}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+        </Style>
+
+        <!-- ── DataGrid dark theme ───────────────────────────────────────── -->
+        <Style x:Key="DarkGrid" TargetType="DataGrid">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="#1E2235"/>
+            <Setter Property="RowBackground" Value="Transparent"/>
+            <Setter Property="AlternatingRowBackground" Value="#1A1E2D"/>
+            <Setter Property="CanUserSortColumns" Value="True"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="ColumnHeaderStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="#181C27"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                        <Setter Property="FontSize"   Value="11"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Padding"    Value="10,8"/>
+                        <Setter Property="BorderBrush" Value="#2A2F45"/>
+                        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="RowStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridRow">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#252A3D"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#1E3A5F"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="CellStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Padding" Value="10,6"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
-    <DockPanel>
-        <!-- ── Title Bar ─────────────────────────────────────────────────── -->
-        <Border DockPanel.Dock="Top" Background="#0A2D6E" Padding="16,8">
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!--  ROOT LAYOUT — Sidebar + Content                                    -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>   <!-- sidebar -->
+            <ColumnDefinition Width="*"/>     <!-- main    -->
+        </Grid.ColumnDefinitions>
+
+        <!-- ════════════════════════════════════════════════════════════════ -->
+        <!--  SIDEBAR                                                         -->
+        <!-- ════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Column="0" Background="{StaticResource BgSurface}"
+                BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
             <DockPanel>
-                <TextBlock Text="SNMP Studio" FontSize="18" FontWeight="Bold"
-                           Foreground="White" VerticalAlignment="Center"/>
-                <TextBlock Text=" v1.0" FontSize="14" Foreground="#7AABFF"
-                           VerticalAlignment="Bottom" Margin="0,0,0,2"/>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Foreground="#AACCFF" FontSize="12" VerticalAlignment="Center"
-                               Text="{Binding MibModules.Count, StringFormat='Modules: {0}  '}"/>
-                    <TextBlock Foreground="#AACCFF" FontSize="12" VerticalAlignment="Center"
-                               Text="{Binding MibCount, StringFormat='Nodes: {0}'}"/>
+                <!-- Logo -->
+                <StackPanel DockPanel.Dock="Top" Margin="16,24,16,20">
+                    <TextBlock Text="SNMP" FontSize="22" FontWeight="Bold"
+                               Foreground="{StaticResource AccentBlue}" LetterSpacing="3"/>
+                    <TextBlock Text="Studio" FontSize="22" FontWeight="Light"
+                               Foreground="{StaticResource TextPrimary}" Margin="0,-4,0,0"/>
+                    <TextBlock Text="v1.0" FontSize="10" Foreground="{StaticResource TextSecondary}"
+                               Margin="0,2,0,0"/>
                 </StackPanel>
-            </DockPanel>
-        </Border>
 
-        <!-- ── Write Mode Warning Banner ─────────────────────────────────── -->
-        <Border DockPanel.Dock="Top" Background="#C0392B" Padding="12,6"
-                Visibility="{Binding WriteModeEnabled, Converter={StaticResource BoolVis}}">
-            <TextBlock Text="⚠  WRITE MODE ENABLED — SET operations are active. Use with caution."
-                       Foreground="White" FontWeight="Bold" HorizontalAlignment="Center"/>
-        </Border>
-
-        <!-- ── Drag-Over Overlay ─────────────────────────────────────────── -->
-        <Border DockPanel.Dock="Top" Background="#1A5276" Padding="12,10"
-                Visibility="{Binding IsDragOver, Converter={StaticResource BoolVis}}">
-            <TextBlock Text="📂  Drop MIB files here to import"
-                       Foreground="White" FontWeight="Bold" FontSize="14"
-                       HorizontalAlignment="Center"/>
-        </Border>
-
-        <!-- ── Status Bar ────────────────────────────────────────────────── -->
-        <Border DockPanel.Dock="Bottom" Background="#E8EBF0" BorderBrush="#CCCCCC"
-                BorderThickness="0,1,0,0" Padding="12,4">
-            <DockPanel>
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" FontSize="12"/>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
-                    <TextBlock Text="{Binding OidCount, StringFormat='OIDs: {0}'}"
-                               VerticalAlignment="Center" Margin="0,0,16,0" FontSize="12"/>
-                    <TextBlock Text="{Binding Elapsed, StringFormat='Elapsed: {0}'}"
-                               VerticalAlignment="Center" FontSize="12"/>
+                <!-- Stats chips -->
+                <StackPanel DockPanel.Dock="Top" Margin="12,0,12,20" Orientation="Horizontal">
+                    <Border Background="#1A2840" CornerRadius="20" Padding="10,4" Margin="0,0,6,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="●" Foreground="{StaticResource AccentBlue}" FontSize="8"
+                                       VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="10"
+                                       Text="{Binding MibModules.Count, StringFormat='{}{0} mod'}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1A2840" CornerRadius="20" Padding="10,4">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="●" Foreground="{StaticResource AccentGreen}" FontSize="8"
+                                       VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="10"
+                                       Text="{Binding MibCount, StringFormat='{}{0} OIDs'}"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-                <ProgressBar IsIndeterminate="True" Width="120" Height="8"
-                             DockPanel.Dock="Right" Margin="16,0"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}"/>
-            </DockPanel>
-        </Border>
 
-        <!-- ── Main Content ───────────────────────────────────────────────── -->
-        <Grid Margin="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>   <!-- Connection panel -->
-                <RowDefinition Height="Auto"/>   <!-- Action bar -->
-                <RowDefinition Height="*"/>      <!-- Tab content -->
-            </Grid.RowDefinitions>
+                <!-- Separator -->
+                <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Border}" Margin="12,0,12,12"/>
 
-            <!-- ── Connection Panel ──────────────────────────────────────── -->
-            <Border Grid.Row="0" Background="White" CornerRadius="6"
-                    Padding="14,10" Margin="0,0,0,8"
-                    BorderBrush="#DDDDDD" BorderThickness="1">
-                <WrapPanel>
-                    <Label Content="Host:" Style="{StaticResource FieldLabel}" Margin="0,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="180"
-                             Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"/>
+                <!-- Nav items -->
+                <StackPanel DockPanel.Dock="Top" Margin="8,0">
+                    <RadioButton Style="{StaticResource NavBtn}" Tag="📡" IsChecked="True"
+                                 x:Name="NavResults">Results</RadioButton>
+                    <RadioButton Style="{StaticResource NavBtn}" Tag="📚"
+                                 x:Name="NavMib">MIB Manager</RadioButton>
+                </StackPanel>
 
-                    <Label Content="Port:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="60"
-                             Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"/>
-
-                    <Label Content="Version:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <ComboBox Width="80" ItemsSource="{Binding Versions}"
-                              SelectedItem="{Binding Version}"
-                              Padding="6,4" VerticalContentAlignment="Center"/>
-
-                    <Label Content="Community:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="120"
-                             Text="{Binding Community, UpdateSourceTrigger=PropertyChanged}"/>
-
-                    <Label Content="Root OID:" Style="{StaticResource FieldLabel}" Margin="12,0,4,0"/>
-                    <TextBox Style="{StaticResource InputBox}" Width="200"
-                             Text="{Binding RootOid, UpdateSourceTrigger=PropertyChanged}"/>
-
-                    <Button Content="Auto-Detect" Style="{StaticResource WarnBtn}" Margin="12,0,0,0"
-                            Command="{Binding NegotiateCommand}"/>
-                </WrapPanel>
-            </Border>
-
-            <!-- ── Action Bar ─────────────────────────────────────────────── -->
-            <Border Grid.Row="1" Background="White" CornerRadius="6"
-                    Padding="14,10" Margin="0,0,0,8"
-                    BorderBrush="#DDDDDD" BorderThickness="1">
-                <WrapPanel>
-                    <Button Content="▶ Walk"         Style="{StaticResource PrimaryBtn}" Command="{Binding WalkCommand}"             Margin="0,0,8,0"/>
-                    <Button Content="⤓ GET"           Style="{StaticResource PrimaryBtn}" Command="{Binding GetCommand}"              Margin="0,0,8,0"/>
-                    <Button Content="✕ Cancel"        Style="{StaticResource DangerBtn}"  Command="{Binding CancelCommand}"           Margin="0,0,16,0"/>
-                    <Button Content="🖨 Printer View"  Style="{StaticResource PrimaryBtn}" Command="{Binding PrinterQuickViewCommand}" Margin="0,0,16,0"/>
-                    <Button Content="Export CSV"     Style="{StaticResource PrimaryBtn}" Command="{Binding ExportCsvCommand}"        Margin="0,0,8,0"/>
-                    <Button Content="Export JSON"    Style="{StaticResource PrimaryBtn}" Command="{Binding ExportJsonCommand}"       Margin="0,0,8,0"/>
-                    <Button Content="📦 Diag Bundle" Style="{StaticResource WarnBtn}"    Command="{Binding ExportBundleCommand}"     Margin="0,0,16,0"/>
-
-                    <CheckBox Content="Write Mode" IsChecked="{Binding WriteModeEnabled}"
-                              VerticalAlignment="Center" Margin="0,0,12,0"
-                              Foreground="#C0392B" FontWeight="SemiBold"/>
-
-                    <!-- SET fields (write mode only) -->
-                    <StackPanel Orientation="Horizontal"
+                <!-- Bottom: write mode toggle -->
+                <Border DockPanel.Dock="Bottom" Margin="12,0,12,16" CornerRadius="8"
+                        Background="#1A1220" BorderBrush="#3D2040" BorderThickness="1" Padding="12,10">
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock Text="Write Mode" FontWeight="SemiBold" FontSize="12"
+                                       Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            <CheckBox DockPanel.Dock="Right" IsChecked="{Binding WriteModeEnabled}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <TextBlock Text="Enables SET operations" FontSize="10" Margin="0,4,0,0"
+                                   Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                        <!-- Write mode indicator -->
+                        <Border Margin="0,8,0,0" CornerRadius="4" Padding="8,5"
                                 Visibility="{Binding WriteModeEnabled, Converter={StaticResource BoolVis}}">
-                        <TextBox Style="{StaticResource InputBox}" Width="180" Text="{Binding SetOid}"
-                                 ToolTip="OID to SET" Margin="0,0,4,0"/>
-                        <ComboBox Width="90" SelectedValue="{Binding SetType}"
-                                  Padding="6,4" VerticalContentAlignment="Center" Margin="0,0,4,0">
-                            <ComboBoxItem Content="INTEGER"/>
-                            <ComboBoxItem Content="STRING"/>
-                            <ComboBoxItem Content="OID"/>
-                            <ComboBoxItem Content="TIMETICKS"/>
-                            <ComboBoxItem Content="GAUGE"/>
-                            <ComboBoxItem Content="COUNTER"/>
-                        </ComboBox>
-                        <TextBox Style="{StaticResource InputBox}" Width="140" Text="{Binding SetValue}"
-                                 ToolTip="Value" Margin="0,0,4,0"/>
-                        <Button Content="SET" Style="{StaticResource DangerBtn}" Command="{Binding SetCommand}"/>
+                            <Border.Background>
+                                <SolidColorBrush Color="#3D1010"/>
+                            </Border.Background>
+                            <TextBlock Text="⚠ Active — use caution" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentRed}" TextAlignment="Center"/>
+                        </Border>
                     </StackPanel>
-                </WrapPanel>
+                </Border>
+
+                <!-- Spacer -->
+                <Rectangle/>
+            </DockPanel>
+        </Border>
+
+        <!-- ════════════════════════════════════════════════════════════════ -->
+        <!--  MAIN CONTENT AREA                                               -->
+        <!-- ════════════════════════════════════════════════════════════════ -->
+        <DockPanel Grid.Column="1">
+
+            <!-- ── Top bar ─────────────────────────────────────────────── -->
+            <Border DockPanel.Dock="Top" Background="{StaticResource BgSurface}"
+                    BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                    Padding="20,12">
+                <DockPanel>
+                    <!-- Status -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="80" Height="4" Margin="0,0,12,0"
+                                     Foreground="{StaticResource AccentBlue}" Background="#2A2F45"
+                                     Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}"/>
+                        <Border Background="#1A2840" CornerRadius="20" Padding="12,5" Margin="0,0,8,0">
+                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="11"
+                                       Text="{Binding OidCount, StringFormat='OIDs: {0}'}"/>
+                        </Border>
+                        <Border Background="#1A2840" CornerRadius="20" Padding="12,5">
+                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="11"
+                                       Text="{Binding Elapsed, StringFormat='⏱ {0}'}"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Status text -->
+                    <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextSecondary}"
+                               FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
             </Border>
 
-            <!-- ── Tabs ───────────────────────────────────────────────────── -->
-            <TabControl Grid.Row="2" BorderBrush="#CCCCCC" BorderThickness="1">
+            <!-- ── Drag-over overlay ────────────────────────────────────── -->
+            <Border DockPanel.Dock="Top" Padding="0,10"
+                    Background="#1A3560"
+                    Visibility="{Binding IsDragOver, Converter={StaticResource BoolVis}}">
+                <TextBlock Text="📂  Drop MIB files to import"
+                           Foreground="{StaticResource AccentBlue}" FontSize="13" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"/>
+            </Border>
 
-                <!-- ══ Results Tab ════════════════════════════════════════════ -->
-                <TabItem Header="Results">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="3*"/>
-                            <RowDefinition Height="5"/>
-                            <RowDefinition Height="1*" MinHeight="80"/>
-                        </Grid.RowDefinitions>
+            <!-- ── Connection + actions panel ──────────────────────────── -->
+            <Border DockPanel.Dock="Top" Style="{StaticResource Card}"
+                    Margin="20,16,20,0" Padding="16,14">
+                <StackPanel>
+                    <!-- Row 1: connection fields -->
+                    <WrapPanel ItemWidth="Auto">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
+                            <TextBlock Text="HOST" Style="{StaticResource FieldLbl}"/>
+                            <TextBox Style="{StaticResource ModernInput}" Width="170"
+                                     Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
+                            <TextBlock Text="PORT" Style="{StaticResource FieldLbl}"/>
+                            <TextBox Style="{StaticResource ModernInput}" Width="56"
+                                     Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
+                            <TextBlock Text="VERSION" Style="{StaticResource FieldLbl}"/>
+                            <ComboBox Style="{StaticResource ModernCombo}" Width="86"
+                                      ItemsSource="{Binding Versions}"
+                                      SelectedItem="{Binding Version}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
+                            <TextBlock Text="COMMUNITY" Style="{StaticResource FieldLbl}"/>
+                            <TextBox Style="{StaticResource ModernInput}" Width="110"
+                                     Text="{Binding Community, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
+                            <TextBlock Text="ROOT OID" Style="{StaticResource FieldLbl}"/>
+                            <TextBox Style="{StaticResource ModernInput}" Width="190"
+                                     Text="{Binding RootOid, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <Button Style="{StaticResource AmberBtn}" Content="⚡ Auto-Detect"
+                                Command="{Binding NegotiateCommand}" Margin="0,0,0,8"/>
+                    </WrapPanel>
 
-                        <!-- Results grid -->
-                        <Border Grid.Row="0" Background="White">
-                            <DataGrid ItemsSource="{Binding Results}"
-                                      AutoGenerateColumns="False" IsReadOnly="True"
-                                      VirtualizingPanel.IsVirtualizing="True"
-                                      VirtualizingPanel.VirtualizationMode="Recycling"
-                                      EnableRowVirtualization="True"
-                                      CanUserSortColumns="True"
-                                      GridLinesVisibility="Horizontal"
-                                      AlternatingRowBackground="#F8F9FB"
-                                      RowBackground="White"
-                                      FontSize="12" BorderThickness="0">
+                    <!-- Divider -->
+                    <Border Height="1" Background="{StaticResource Border}" Margin="0,4,0,12"/>
+
+                    <!-- Row 2: actions -->
+                    <WrapPanel>
+                        <Button Style="{StaticResource PillBtn}"  Content="▶  Walk"         Command="{Binding WalkCommand}"             Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource PillBtn}"  Content="↓  GET"           Command="{Binding GetCommand}"              Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource RedBtn}"   Content="✕  Cancel"        Command="{Binding CancelCommand}"           Margin="0,0,20,0"/>
+                        <Button Style="{StaticResource GhostBtn}" Content="🖨  Printer View"  Command="{Binding PrinterQuickViewCommand}" Margin="0,0,20,0"/>
+                        <Button Style="{StaticResource GhostBtn}" Content="Export CSV"      Command="{Binding ExportCsvCommand}"        Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource GhostBtn}" Content="Export JSON"     Command="{Binding ExportJsonCommand}"       Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource AmberBtn}" Content="📦  Diag Bundle" Command="{Binding ExportBundleCommand}"     Margin="0,0,0,0"/>
+
+                        <!-- SET row (write mode) -->
+                        <StackPanel Orientation="Horizontal" Margin="20,0,0,0"
+                                    Visibility="{Binding WriteModeEnabled, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="OID" Style="{StaticResource FieldLbl}" Margin="0,0,6,0"/>
+                            <TextBox Style="{StaticResource ModernInput}" Width="170" Text="{Binding SetOid}" Margin="0,0,8,0"/>
+                            <ComboBox Style="{StaticResource ModernCombo}" Width="96" SelectedValue="{Binding SetType}" Margin="0,0,8,0">
+                                <ComboBoxItem Content="INTEGER"/>
+                                <ComboBoxItem Content="STRING"/>
+                                <ComboBoxItem Content="OID"/>
+                                <ComboBoxItem Content="TIMETICKS"/>
+                                <ComboBoxItem Content="GAUGE"/>
+                                <ComboBoxItem Content="COUNTER"/>
+                            </ComboBox>
+                            <TextBox Style="{StaticResource ModernInput}" Width="130" Text="{Binding SetValue}" Margin="0,0,8,0"/>
+                            <Button Style="{StaticResource RedBtn}" Content="SET" Command="{Binding SetCommand}"/>
+                        </StackPanel>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ── Page content (nav-switched) ─────────────────────────── -->
+            <Grid Margin="20,16,20,20">
+
+                <!-- ══ RESULTS PAGE ═══════════════════════════════════════ -->
+                <Grid Visibility="{Binding IsChecked, ElementName=NavResults, Converter={StaticResource BoolVis}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="3*"/>
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="1*" MinHeight="90"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Results table -->
+                    <Border Grid.Row="0" Style="{StaticResource Card}" ClipToBounds="True">
+                        <DockPanel>
+                            <!-- Table header bar -->
+                            <Border DockPanel.Dock="Top" Background="#181C27"
+                                    BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                                    Padding="16,10">
+                                <TextBlock Text="Query Results" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource TextPrimary}"/>
+                            </Border>
+                            <DataGrid Style="{StaticResource DarkGrid}"
+                                      ItemsSource="{Binding Results}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="OID"           Binding="{Binding Oid}"          Width="200"/>
                                     <DataGridTextColumn Header="Symbolic Name" Binding="{Binding SymbolicName}" Width="180"/>
-                                    <DataGridTextColumn Header="Raw Value"     Binding="{Binding RawValue}"     Width="150"/>
-                                    <DataGridTextColumn Header="Human Value"   Binding="{Binding HumanValue}"   Width="190"/>
+                                    <DataGridTextColumn Header="Raw Value"     Binding="{Binding RawValue}"     Width="140"/>
+                                    <DataGridTextColumn Header="Human Value"   Binding="{Binding HumanValue}"   Width="180"/>
                                     <DataGridTextColumn Header="Type"          Binding="{Binding Type}"         Width="100"/>
                                     <DataGridTextColumn Header="Description"   Binding="{Binding Description}"  Width="*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                        </Border>
+                        </DockPanel>
+                    </Border>
 
-                        <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"
-                                      Background="#CCCCCC" ShowsPreview="True"/>
+                    <!-- Splitter -->
+                    <GridSplitter Grid.Row="1" HorizontalAlignment="Stretch"
+                                  Background="Transparent" ShowsPreview="False"/>
 
-                        <!-- Log pane -->
-                        <Border Grid.Row="2" Background="#1E1E2E" CornerRadius="0,0,4,4"
-                                BorderBrush="#444466" BorderThickness="0,1,0,0">
-                            <DockPanel>
-                                <DockPanel DockPanel.Dock="Top" Background="#2A2A3E" LastChildFill="False">
-                                    <TextBlock Text="Diagnostics Log" Foreground="#AABBFF"
-                                               FontWeight="SemiBold" Padding="10,6" FontSize="12"/>
-                                    <Button DockPanel.Dock="Right" Content="Clear" Margin="8,4"
-                                            Style="{StaticResource DangerBtn}" FontSize="11"
-                                            Command="{Binding ClearLogCommand}"/>
-                                </DockPanel>
-                                <ListBox ItemsSource="{Binding LogEntries}"
-                                         Background="Transparent" BorderThickness="0"
-                                         VirtualizingPanel.IsVirtualizing="True"
-                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                         Padding="6">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock FontFamily="Consolas" FontSize="11"
-                                                       Text="{Binding}" Foreground="#CCDDFF"
-                                                       TextWrapping="Wrap"/>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                    <!-- Log pane -->
+                    <Border Grid.Row="2" Style="{StaticResource Card}" ClipToBounds="True">
+                        <DockPanel>
+                            <DockPanel DockPanel.Dock="Top" Background="#181C27"
+                                       LastChildFill="False"
+                                       BorderBrush="{StaticResource Border}" 
+                                       Height="38">
+                                <TextBlock Text="Diagnostics Log" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           VerticalAlignment="Center" Margin="16,0"/>
+                                <Button DockPanel.Dock="Right" Content="Clear"
+                                        Style="{StaticResource RedBtn}" FontSize="10"
+                                        Padding="10,4" Margin="10,0"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding ClearLogCommand}"/>
                             </DockPanel>
-                        </Border>
-                    </Grid>
-                </TabItem>
+                            <ListBox ItemsSource="{Binding LogEntries}"
+                                     Background="Transparent" BorderThickness="0"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     Padding="12,8">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding" Value="0,1"/>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock FontFamily="Cascadia Code, Consolas, Courier New"
+                                                   FontSize="11" Text="{Binding}"
+                                                   Foreground="#7A8ECC"
+                                                   TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
+                </Grid>
 
-                <!-- ══ MIB Manager Tab ════════════════════════════════════════ -->
-                <TabItem Header="MIB Manager">
-                    <Grid Margin="12">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>  <!-- Toolbar -->
-                            <RowDefinition Height="Auto"/>  <!-- Drop zone -->
-                            <RowDefinition Height="*"/>     <!-- Module list -->
-                        </Grid.RowDefinitions>
+                <!-- ══ MIB MANAGER PAGE ═══════════════════════════════════ -->
+                <Grid Visibility="{Binding IsChecked, ElementName=NavMib, Converter={StaticResource BoolVis}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="16"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                        <!-- Toolbar -->
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                            <Button Content="📂 Import MIB File(s)" Style="{StaticResource PrimaryBtn}"
-                                    Command="{Binding ImportMibCommand}" Margin="0,0,8,0"/>
-                            <Button Content="🗑 Remove Selected" Style="{StaticResource DangerBtn}"
-                                    Command="{Binding RemoveModuleCommand}" Margin="0,0,8,0"/>
-                            <Button Content="⬛ Clear All Cache" Style="{StaticResource WarnBtn}"
-                                    Command="{Binding ClearMibCacheCommand}"/>
-                            <TextBlock VerticalAlignment="Center" Margin="16,0,0,0"
-                                       Foreground="#555555" FontSize="12"
-                                       Text="{Binding MibCount, StringFormat='Total nodes in memory: {0}'}"/>
-                        </StackPanel>
+                    <!-- Top row: drop zone + actions -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="280"/>
+                        </Grid.ColumnDefinitions>
 
-                        <!-- Drag-drop zone -->
-                        <Border Grid.Row="1" Margin="0,0,0,10" CornerRadius="6"
-                                BorderThickness="2" Padding="20,16"
-                                HorizontalAlignment="Stretch">
+                        <!-- Drop zone -->
+                        <Border Grid.Column="0" CornerRadius="10" Padding="0,32"
+                                BorderThickness="2" HorizontalAlignment="Stretch">
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="Background"   Value="#F8F9FB"/>
-                                    <Setter Property="BorderBrush"  Value="#AABBCC"/>
-                                    <Setter Property="BorderThickness" Value="2"/>
+                                    <Setter Property="Background"   Value="#181C27"/>
+                                    <Setter Property="BorderBrush"  Value="#2A2F45"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsDragOver}" Value="True">
-                                            <Setter Property="Background"  Value="#D6EAF8"/>
-                                            <Setter Property="BorderBrush" Value="#2980B9"/>
+                                            <Setter Property="Background"  Value="#0D1F40"/>
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
                             <StackPanel HorizontalAlignment="Center">
-                                <TextBlock Text="📂" FontSize="28" HorizontalAlignment="Center"/>
-                                <TextBlock Text="Drag &amp; drop MIB files or folders here"
-                                           FontSize="14" FontWeight="SemiBold"
-                                           Foreground="#2C3E50" HorizontalAlignment="Center"
-                                           Margin="0,6,0,2"/>
-                                <TextBlock Text="Supports .mib  .my  .txt — HP, Cisco, Xerox, Ricoh, Kyocera, and more"
-                                           FontSize="11" Foreground="#7F8C8D"
+                                <TextBlock Text="📂" FontSize="36" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Drag &amp; drop MIB files or folders"
+                                           FontSize="15" FontWeight="SemiBold" Margin="0,10,0,4"
+                                           Foreground="{StaticResource TextPrimary}"
                                            HorizontalAlignment="Center"/>
-                                <TextBlock Text="MIBs are parsed once and cached to %APPDATA%\SNMPStudio — instant on next launch"
-                                           FontSize="11" Foreground="#7F8C8D"
-                                           HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                <TextBlock Text=".mib  ·  .my  ·  .txt"
+                                           FontSize="12" Foreground="{StaticResource TextSecondary}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="HP · Cisco · Xerox · Ricoh · Kyocera · Brother · Lexmark · Sharp"
+                                           FontSize="11" Foreground="#4A5270" Margin="0,6,0,0"
+                                           HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Module list -->
-                        <Border Grid.Row="2" Background="White" CornerRadius="6"
-                                BorderBrush="#DDDDDD" BorderThickness="1">
-                            <DockPanel>
-                                <Border DockPanel.Dock="Top" Background="#F0F4FA"
-                                        BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="10,6">
-                                    <TextBlock FontWeight="SemiBold" FontSize="12" Foreground="#2C3E50"
-                                               Text="{Binding MibModules.Count, StringFormat='Loaded Modules ({0})'}"/>
-                                </Border>
-                                <DataGrid ItemsSource="{Binding MibModules}"
-                                          SelectedItem="{Binding SelectedModule}"
-                                          AutoGenerateColumns="False" IsReadOnly="True"
-                                          GridLinesVisibility="Horizontal"
-                                          AlternatingRowBackground="#F8F9FB"
-                                          RowBackground="White"
-                                          CanUserSortColumns="True"
-                                          FontSize="12" BorderThickness="0"
-                                          SelectionMode="Single">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Module Name" Binding="{Binding ModuleName}" Width="220"/>
-                                        <DataGridTextColumn Header="Nodes"       Binding="{Binding NodeCount}"  Width="80"/>
-                                        <DataGridTextColumn Header="Source"      Binding="{Binding Summary}"    Width="130"/>
-                                        <DataGridTextColumn Header="Source Path" Binding="{Binding SourcePath}" Width="*"/>
-                                        <DataGridTextColumn Header="Imported"
-                                                            Binding="{Binding ImportedAt, StringFormat='yyyy-MM-dd HH:mm'}"
-                                                            Width="140"/>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-                            </DockPanel>
+                        <!-- Actions card -->
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,18">
+                            <StackPanel>
+                                <TextBlock Text="ACTIONS" Style="{StaticResource FieldLbl}" Margin="0,0,0,14"/>
+
+                                <Button Style="{StaticResource PillBtn}" Content="📂  Import File(s)"
+                                        Command="{Binding ImportMibCommand}"
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                                <Button Style="{StaticResource RedBtn}" Content="🗑  Remove Selected"
+                                        Command="{Binding RemoveModuleCommand}"
+                                        HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                                <Button Style="{StaticResource AmberBtn}" Content="⬛  Clear All Cache"
+                                        Command="{Binding ClearMibCacheCommand}"
+                                        HorizontalAlignment="Stretch" Foreground="#1A1A1A"/>
+
+                                <Border Height="1" Background="{StaticResource Border}" Margin="0,16"/>
+
+                                <TextBlock Text="CACHE" Style="{StaticResource FieldLbl}" Margin="0,0,0,8"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" LineHeight="18"
+                                           Foreground="{StaticResource TextSecondary}">
+                                    MIBs are parsed once and persisted to<LineBreak/>
+                                    <Run Foreground="{StaticResource AccentBlue}">%APPDATA%\SNMPStudio\</Run><LineBreak/>
+                                    Instant load on every subsequent launch.
+                                </TextBlock>
+
+                                <Border Height="1" Background="{StaticResource Border}" Margin="0,16"/>
+
+                                <!-- Totals -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="Modules" Foreground="{StaticResource TextSecondary}" FontSize="12" Width="80"/>
+                                    <TextBlock Foreground="{StaticResource AccentBlue}" FontSize="12" FontWeight="SemiBold"
+                                               Text="{Binding MibModules.Count}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Total nodes" Foreground="{StaticResource TextSecondary}" FontSize="12" Width="80"/>
+                                    <TextBlock Foreground="{StaticResource AccentGreen}" FontSize="12" FontWeight="SemiBold"
+                                               Text="{Binding MibCount}"/>
+                                </StackPanel>
+                            </StackPanel>
                         </Border>
                     </Grid>
-                </TabItem>
 
-            </TabControl>
-        </Grid>
-    </DockPanel>
+                    <!-- Module table -->
+                    <Border Grid.Row="2" Style="{StaticResource Card}" ClipToBounds="True">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Top" Background="#181C27"
+                                    BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                                    Padding="16,10">
+                                <TextBlock FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           Text="{Binding MibModules.Count, StringFormat='Loaded Modules  ({0})'}"/>
+                            </Border>
+                            <DataGrid Style="{StaticResource DarkGrid}"
+                                      ItemsSource="{Binding MibModules}"
+                                      SelectedItem="{Binding SelectedModule}"
+                                      SelectionMode="Single">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Module"      Binding="{Binding ModuleName}" Width="220"/>
+                                    <DataGridTextColumn Header="Nodes"       Binding="{Binding NodeCount}"  Width="80"/>
+                                    <DataGridTextColumn Header="Source"      Binding="{Binding Summary}"    Width="110"/>
+                                    <DataGridTextColumn Header="File Path"   Binding="{Binding SourcePath}" Width="*"/>
+                                    <DataGridTextColumn Header="Imported"
+                                                        Binding="{Binding ImportedAt, StringFormat='yyyy-MM-dd HH:mm'}"
+                                                        Width="130"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
+            </Grid>
+        </DockPanel>
+    </Grid>
 </Window>
