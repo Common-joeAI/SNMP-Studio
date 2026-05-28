@@ -7,20 +7,20 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>SNMP.App</RootNamespace>
     <AssemblyName>SNMPStudio</AssemblyName>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <Product>SNMP Studio</Product>
-    <Company>Bennett Joseph</Company>
-    <Copyright>Copyright © 2026 Bennett Joseph. All rights reserved.</Copyright>
+    <Company>Western Alliance Bank</Company>
+    <Copyright>Copyright © 2026 Western Alliance Bank. All rights reserved.</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SNMP.Core\SNMP.Core.csproj"/>
     <ProjectReference Include="..\SNMP.Engine\SNMP.Engine.csproj"/>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0"/>
-    <!-- System.Windows.Forms for FolderBrowserDialog in export -->
-    <PackageReference Include="Microsoft.WindowsDesktop.App.WindowsForms" Version="8.0.0"/>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection"      Version="8.0.0"/>
+    <PackageReference Include="Microsoft.WindowsDesktop.App.WindowsForms"     Version="8.0.0"/>
+    <PackageReference Include="OxyPlot.Wpf"                                   Version="2.1.2"/>
   </ItemGroup>
 </Project>
