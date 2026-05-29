@@ -252,37 +252,91 @@ public sealed class MibRepository : IMibRepository
             @"(\w+)\s+OBJECT\s+IDENTIFIER\s*::=\s*\{\s*(\w+)\s+(\d+)\s*\}",
             RegexOptions.IgnoreCase);
 
-        // Seed with well-known roots + common vendor OID parents
+        // ── OID parent seed table ────────────────────────────────────────────────
+        // Allows the parser to resolve parent references in vendor MIB files
+        // without needing to import every dependency MIB first.
+        // Covers: standard RFC roots + HP FutureSmart subtree + Cisco subtree
+        // + common printer vendors.
         var nameToOid = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["iso"]          = "1",
-            ["org"]          = "1.3",
-            ["dod"]          = "1.3.6",
-            ["internet"]     = "1.3.6.1",
-            ["mgmt"]         = "1.3.6.1.2",
-            ["mib-2"]        = "1.3.6.1.2.1",
-            ["transmission"] = "1.3.6.1.2.1.10",
-            ["enterprises"]  = "1.3.6.1.4.1",
-            ["experimental"] = "1.3.6.1.3",
-            ["private"]      = "1.3.6.1.4",
-            // HP / Hewlett-Packard
-            ["hp"]           = "1.3.6.1.4.1.11",
-            ["nm"]           = "1.3.6.1.4.1.11.2",
-            ["hpnpSNMP"]     = "1.3.6.1.4.1.11.2.3.9.4",
-            // Cisco
-            ["cisco"]        = "1.3.6.1.4.1.9",
-            // Xerox
-            ["xerox"]        = "1.3.6.1.4.1.253",
-            // Ricoh
-            ["ricoh"]        = "1.3.6.1.4.1.367",
-            // Kyocera
-            ["kyocera"]      = "1.3.6.1.4.1.1347",
-            // Brother
-            ["brother"]      = "1.3.6.1.4.1.2435",
-            // Lexmark
-            ["lexmark"]      = "1.3.6.1.4.1.641",
-            // Sharp
-            ["sharp"]        = "1.3.6.1.4.1.822",
+            // RFC / standard roots
+            ["iso"]              = "1",
+            ["org"]              = "1.3",
+            ["dod"]              = "1.3.6",
+            ["internet"]         = "1.3.6.1",
+            ["mgmt"]             = "1.3.6.1.2",
+            ["mib-2"]            = "1.3.6.1.2.1",
+            ["system"]           = "1.3.6.1.2.1.1",
+            ["interfaces"]       = "1.3.6.1.2.1.2",
+            ["ip"]               = "1.3.6.1.2.1.4",
+            ["tcp"]              = "1.3.6.1.2.1.6",
+            ["udp"]              = "1.3.6.1.2.1.7",
+            ["transmission"]     = "1.3.6.1.2.1.10",
+            ["snmp"]             = "1.3.6.1.2.1.11",
+            ["ifMIB"]            = "1.3.6.1.2.1.31",
+            ["hostResources"]    = "1.3.6.1.2.1.25",
+            ["hrSystem"]         = "1.3.6.1.2.1.25.1",
+            ["hrStorage"]        = "1.3.6.1.2.1.25.2",
+            ["hrDevice"]         = "1.3.6.1.2.1.25.3",
+            ["printmib"]         = "1.3.6.1.2.1.43",
+            ["enterprises"]      = "1.3.6.1.4.1",
+            ["experimental"]     = "1.3.6.1.3",
+            ["private"]          = "1.3.6.1.4",
+            ["mib"]              = "1.3.6.1.2.1",
+            ["entityMIB"]        = "1.3.6.1.2.1.47",
+            ["bgp"]              = "1.3.6.1.2.1.15",
+            ["ospf"]             = "1.3.6.1.2.1.14",
+
+            // ── HP / Hewlett-Packard FutureSmart subtree ─────────────────────
+            ["hp"]               = "1.3.6.1.4.1.11",
+            ["nm"]               = "1.3.6.1.4.1.11.2",
+            ["hpnpSNMP"]         = "1.3.6.1.4.1.11.2.3.9",
+            ["hpnpSNMPsys"]      = "1.3.6.1.4.1.11.2.3.9.1",
+            ["hpnpSNMPdev"]      = "1.3.6.1.4.1.11.2.3.9.4",
+            ["hpDeviceInfo"]     = "1.3.6.1.4.1.11.2.3.9.4.2",
+            ["hpFSIdentity"]     = "1.3.6.1.4.1.11.2.3.9.4.2.1.1",
+            ["hpFSStatus"]       = "1.3.6.1.4.1.11.2.3.9.4.2.1.2",
+            ["hpFSInput"]        = "1.3.6.1.4.1.11.2.3.9.4.2.1.5",
+            ["hpFSMarker"]       = "1.3.6.1.4.1.11.2.3.9.4.2.1.6",
+            ["hpFSNetwork"]      = "1.3.6.1.4.1.11.2.3.9.4.2.2",
+            ["hpFSSecurity"]     = "1.3.6.1.4.1.11.2.3.9.4.2.3",
+            ["hpJetDirect"]      = "1.3.6.1.4.1.11.2.4.3",
+
+            // ── Cisco Systems subtree ────────────────────────────────────────
+            ["cisco"]            = "1.3.6.1.4.1.9",
+            ["ciscoProducts"]    = "1.3.6.1.4.1.9.1",
+            ["ciscoLocal"]       = "1.3.6.1.4.1.9.2",
+            ["ciscoMgmt"]        = "1.3.6.1.4.1.9.9",
+            ["ciscoExperiment"]  = "1.3.6.1.4.1.9.10",
+            ["ciscoConfig"]      = "1.3.6.1.4.1.9.12",
+            ["ciscoPartnerProducts"] = "1.3.6.1.4.1.9.6",
+            // Named ciscoMgmt sub-roots (allows parser to resolve parent= in vendor MIBs)
+            ["ciscoEnvMonMIBObjects"]    = "1.3.6.1.4.1.9.9.13.1",
+            ["ciscoProcessMIBObjects"]   = "1.3.6.1.4.1.9.9.109.1",
+            ["cpmCPUTotalTable"]         = "1.3.6.1.4.1.9.9.109.1.1.1",
+            ["ciscoMemoryPoolMIBObjects"]= "1.3.6.1.4.1.9.9.48.1",
+            ["ciscoVtpMIBObjects"]       = "1.3.6.1.4.1.9.9.46.1",
+            ["ciscoCdpMIBObjects"]       = "1.3.6.1.4.1.9.9.23.1",
+            ["cbQosMIBObjects"]          = "1.3.6.1.4.1.9.9.166.1",
+            ["ciscoHsrpMIBObjects"]      = "1.3.6.1.4.1.9.9.106.1",
+            ["ciscoEigrpMIBObjects"]     = "1.3.6.1.4.1.9.9.362.1",
+            ["ciscoCfgManMIBObjects"]    = "1.3.6.1.4.1.9.9.43.1",
+            ["ciscoSyslogMIBObjects"]    = "1.3.6.1.4.1.9.9.41.1",
+            ["ciscoNtpMIBObjects"]       = "1.3.6.1.4.1.9.9.168.1",
+            ["ciscoStackMIBObjects"]     = "1.3.6.1.4.1.9.9.500.1",
+            ["ciscoStpExtMIBObjects"]    = "1.3.6.1.4.1.9.9.82.1",
+            ["ciscoVlanMembershipMIBObjects"] = "1.3.6.1.4.1.9.9.68.1",
+
+            // ── Other printer vendors ────────────────────────────────────────
+            ["xerox"]            = "1.3.6.1.4.1.253",
+            ["ricoh"]            = "1.3.6.1.4.1.367",
+            ["kyocera"]          = "1.3.6.1.4.1.1347",
+            ["brother"]          = "1.3.6.1.4.1.2435",
+            ["lexmark"]          = "1.3.6.1.4.1.641",
+            ["sharp"]            = "1.3.6.1.4.1.822",
+            ["samsung"]          = "1.3.6.1.4.1.236",
+            ["canon"]            = "1.3.6.1.4.1.1602",
+            ["konica"]           = "1.3.6.1.4.1.18334",
         };
 
         foreach (Match m in oidPattern.Matches(text))
