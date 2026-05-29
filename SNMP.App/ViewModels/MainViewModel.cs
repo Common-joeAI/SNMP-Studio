@@ -212,6 +212,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool _isDiscovering;
     public bool IsDiscovering { get => _isDiscovering; set { Set(ref _isDiscovering, value); RaiseCommandsChanged(); } }
 
+    /// <summary>
+    /// When true the Discovery page renders one collapsible card per subnet
+    /// instead of a flat host list. Each card shows the subnet CIDR (or label),
+    /// live counts, and a DataGrid of hosts scanned within that block.
+    /// </summary>
+    private bool _groupBySubnet = true;
+    public bool GroupBySubnet
+    {
+        get => _groupBySubnet;
+        set { Set(ref _groupBySubnet, value); RebuildSubnetGroups(); }
+    }
+
+    /// <summary>Grouped view — one entry per subnet.</summary>
+    public ObservableCollection<DiscoverySubnetGroup> SubnetGroups { get; } = new();
+
+    /// <summary>Currently selected host (shared between flat and grouped view).</summary>
+    private DiscoveredHost? _selectedDiscoveredHost;
+    public DiscoveredHost? SelectedDiscoveredHost
+    {
+        get => _selectedDiscoveredHost;
+        set { Set(ref _selectedDiscoveredHost, value); }
+    }
+
+    /// <summary>Quick-filter text applied to flat host list and subnet group contents.</summary>
+    private string _discoveryFilter = string.Empty;
+    public string DiscoveryFilter
+    {
+        get => _discoveryFilter;
+        set { Set(ref _discoveryFilter, value); ApplyDiscoveryFilter(); }
+    }
+
+    public ObservableCollection<DiscoveredHost> FilteredDiscoveredHosts { get; } = new();
+
     // ══════════════════════════════════════════════════════════════════════════
     // Live Polling + OxyPlot
     // ══════════════════════════════════════════════════════════════════════════
@@ -292,7 +325,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand ClearTrapsCommand        { get; }
     public ICommand StartDiscoveryCommand    { get; }
     public ICommand CancelDiscoveryCommand   { get; }
-    public ICommand ConnectDiscoveredCommand { get; }
+    public ICommand ConnectDiscoveredCommand  { get; }
+    public ICommand ToggleSubnetGroupCommand  { get; }
     public ICommand AddPollCommand           { get; }
     public ICommand RemovePollCommand        { get; }
     public ICommand SaveTargetCommand        { get; }
@@ -352,7 +386,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ClearTrapsCommand        = new RelayCommand(() => { Traps.Clear(); FilteredTraps.Clear(); TrapCount = 0; });
         StartDiscoveryCommand    = new RelayCommand(async () => await DoDiscoveryAsync(),         () => !IsDiscovering);
         CancelDiscoveryCommand   = new RelayCommand(CancelAll,                                    () => IsDiscovering);
-        ConnectDiscoveredCommand = new RelayCommand<DiscoveredHost>(ConnectDiscovered);
+        ConnectDiscoveredCommand  = new RelayCommand<DiscoveredHost>(ConnectDiscovered);
+        ToggleSubnetGroupCommand  = new RelayCommand<DiscoverySubnetGroup>(grp =>
+        {
+            if (grp != null) grp.IsExpanded = !grp.IsExpanded;
+        });
         AddPollCommand           = new RelayCommand(AddPollSeries,                                () => !string.IsNullOrWhiteSpace(PollOid));
         RemovePollCommand        = new RelayCommand(RemovePollSeries,                             () => SelectedPoll != null);
         SaveTargetCommand        = new RelayCommand(async () => await DoSaveTargetAsync(),        () => !string.IsNullOrWhiteSpace(Host));
@@ -599,16 +637,62 @@ public sealed class MainViewModel : INotifyPropertyChanged
     // ══════════════════════════════════════════════════════════════════════════
     private async Task DoDiscoveryAsync()
     {
-        DiscoveredHosts.Clear(); DiscoveryCount = 0;
-        IsDiscovering = true; _cts = new CancellationTokenSource();
-        var communities = DiscoveryCommunities.Split(',').Select(c => c.Trim()).Where(c => c.Length > 0);
-        StatusText = $"Scanning {DiscoveryCidr}…";
+        DiscoveredHosts.Clear();
+        FilteredDiscoveredHosts.Clear();
+        SubnetGroups.Clear();
+        DiscoveryCount = 0;
+
+        // Pre-build one group per subnet so cards appear immediately
+        var entries = SNMP.Engine.Services.DiscoveryService.ParseCidrList(DiscoveryCidr);
+        foreach (var (label, cidr) in entries)
+        {
+            SubnetGroups.Add(new DiscoverySubnetGroup
+            {
+                Subnet = cidr,
+                Label  = label,
+            });
+        }
+
+        IsDiscovering = true;
+        _cts = new CancellationTokenSource();
+        var communities = DiscoveryCommunities
+            .Split(',').Select(c => c.Trim()).Where(c => c.Length > 0);
+
+        var cidrCount  = entries.Count;
+        var totalHosts = 0;
+        StatusText = cidrCount == 1
+            ? $"Scanning {DiscoveryCidr}…"
+            : $"Scanning {cidrCount} subnets…";
+
         try
         {
             await foreach (var h in _discovery.DiscoverAsync(DiscoveryCidr, communities, ct: _cts.Token))
-                App.Current.Dispatcher.Invoke(() => { DiscoveredHosts.Add(h); DiscoveryCount++; });
-            StatusText = $"Discovery done — {DiscoveryCount} hosts found.";
-            _log.Info($"Discovery complete: {DiscoveryCount} hosts");
+            {
+                App.Current.Dispatcher.Invoke(() =>
+                {
+                    DiscoveredHosts.Add(h);
+                    DiscoveryCount++;
+                    totalHosts++;
+
+                    // Add to the matching subnet group
+                    var grp = SubnetGroups.FirstOrDefault(g => g.Subnet == h.SourceSubnet);
+                    if (grp != null)
+                    {
+                        grp.Hosts.Add(h);
+                        grp.TotalScanned++;
+                        grp.RefreshStats();
+                    }
+
+                    // Update flat filtered list
+                    if (MatchesDiscoveryFilter(h))
+                        FilteredDiscoveredHosts.Add(h);
+                });
+            }
+
+            StatusText = cidrCount == 1
+                ? $"Discovery done — {DiscoveryCount} hosts found."
+                : $"Discovery done — {DiscoveryCount} hosts across {cidrCount} subnets.";
+            _log.Info($"Discovery complete: {DiscoveryCount} hosts in {cidrCount} subnet(s)");
         }
         catch (OperationCanceledException) { StatusText = "Discovery cancelled."; }
         catch (Exception ex) { StatusText = $"Discovery error: {ex.Message}"; }
@@ -621,6 +705,58 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Host = h.IpAddress; Version = h.BestVersion;
         Community = h.BestCommunity.Length > 0 ? h.BestCommunity : "public";
         StatusText = $"Loaded {h.IpAddress} — click Walk to browse.";
+    }
+
+    // ── Discovery filter ──────────────────────────────────────────────────────
+
+    private void ApplyDiscoveryFilter()
+    {
+        FilteredDiscoveredHosts.Clear();
+        foreach (var h in DiscoveredHosts.Where(MatchesDiscoveryFilter))
+            FilteredDiscoveredHosts.Add(h);
+
+        // Also filter inside each subnet group
+        if (GroupBySubnet)
+        {
+            foreach (var grp in SubnetGroups)
+            {
+                grp.Hosts.Clear();
+                foreach (var h in DiscoveredHosts
+                    .Where(h => h.SourceSubnet == grp.Subnet && MatchesDiscoveryFilter(h)))
+                    grp.Hosts.Add(h);
+                grp.RefreshStats();
+            }
+        }
+    }
+
+    private bool MatchesDiscoveryFilter(DiscoveredHost h)
+    {
+        if (string.IsNullOrWhiteSpace(DiscoveryFilter)) return true;
+        var f = DiscoveryFilter.ToLowerInvariant();
+        return h.IpAddress.Contains(f)
+            || h.Hostname.Contains(f, StringComparison.OrdinalIgnoreCase)
+            || h.SysName.Contains(f,  StringComparison.OrdinalIgnoreCase)
+            || h.SysDescr.Contains(f, StringComparison.OrdinalIgnoreCase)
+            || h.DeviceType.Contains(f, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RebuildSubnetGroups()
+    {
+        // Called when GroupBySubnet is toggled mid-session
+        if (!GroupBySubnet) return;
+        SubnetGroups.Clear();
+        var byCidr = DiscoveredHosts.GroupBy(h => h.SourceSubnet);
+        var labels = SNMP.Engine.Services.DiscoveryService.ParseCidrList(DiscoveryCidr)
+                        .ToDictionary(e => e.Cidr, e => e.Label);
+        foreach (var group in byCidr.OrderBy(g => g.Key))
+        {
+            var label = labels.TryGetValue(group.Key, out var l) ? l : group.Key;
+            var sg    = new DiscoverySubnetGroup { Subnet = group.Key, Label = label };
+            foreach (var h in group.Where(MatchesDiscoveryFilter))
+                sg.Hosts.Add(h);
+            sg.RefreshStats();
+            SubnetGroups.Add(sg);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
