@@ -18,15 +18,22 @@ public partial class App : Application
 
         var sc = new ServiceCollection();
 
-        // Core services
-        sc.AddSingleton<ILogService,         LogService>();
-        sc.AddSingleton<IMibRepository,      MibRepository>();
-        sc.AddSingleton<IOidTranslator,      OidTranslator>();
-        sc.AddSingleton<ISnmpClient,         SnmpClient>();
-        sc.AddSingleton<INegotiationService, NegotiationService>();
-        sc.AddSingleton<IExportService,      ExportService>();
+        // ── Core services ──────────────────────────────────────────────────
+        sc.AddSingleton<ILogService,          LogService>();
+        sc.AddSingleton<IMibRepository,       MibRepository>();
+        sc.AddSingleton<IOidTranslator,       OidTranslator>();
+        sc.AddSingleton<ISnmpClient,          SnmpClient>();
+        sc.AddSingleton<INegotiationService,  NegotiationService>();
+        sc.AddSingleton<IExportService,       ExportService>();
 
-        // ViewModel + View
+        // ── New services (v1.1) ────────────────────────────────────────────
+        sc.AddSingleton<ITrapReceiver,        TrapReceiver>();
+        sc.AddSingleton<IDiscoveryService,    DiscoveryService>();
+        sc.AddSingleton<ITargetStore,         TargetStore>();
+        sc.AddSingleton<IV3ProfileStore,      V3ProfileStore>();
+        sc.AddSingleton<TableParser>();
+
+        // ── UI ─────────────────────────────────────────────────────────────
         sc.AddTransient<MainViewModel>();
         sc.AddTransient<MainWindow>();
 
@@ -38,6 +45,14 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // Ensure trap listener is stopped cleanly on exit
+        try
+        {
+            var trap = _services?.GetService<ITrapReceiver>();
+            trap?.Stop();
+        }
+        catch { /* best-effort */ }
+
         _services?.Dispose();
         base.OnExit(e);
     }
