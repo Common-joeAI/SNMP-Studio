@@ -862,10 +862,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private async Task DoExportBundleAsync()
     {
-        var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Select output folder" };
-        if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-        var path = await _export.ExportDiagnosticsBundleAsync(Results, _log.Entries, BuildTarget(), dlg.SelectedPath);
-        StatusText = $"Bundle: {path}";
+        // OpenFolderDialog is native WPF since .NET 8 — no WinForms dependency required.
+        var dlg = new OpenFolderDialog
+        {
+            Title            = "Select diagnostics output folder",
+            Multiselect      = false,
+        };
+        if (dlg.ShowDialog() != true || string.IsNullOrEmpty(dlg.FolderName)) return;
+        var path = await _export.ExportDiagnosticsBundleAsync(Results, _log.Entries, BuildTarget(), dlg.FolderName);
+        StatusText = $"Bundle saved: {path}";
     }
 
     private async Task DoSetAsync()
