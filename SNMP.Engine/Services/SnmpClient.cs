@@ -29,22 +29,45 @@ public sealed class SnmpClient : ISnmpClient
             var ep = await ResolveEndpointAsync(target).ConfigureAwait(false);
             var vList = new List<Variable> { new(new ObjectIdentifier(oid)) };
 
-            IList<Variable> result = target.Version switch
+            IList<Variable>? result = null;
+            Exception? lastException = null;
+
+            // Retry logic for transient network errors
+            for (int attempt = 0; attempt <= target.Retries; attempt++)
             {
-                SnmpVersion.V1 => await Task.Run(() =>
-                    Messenger.Get(VersionCode.V1, ep,
-                        new OctetString(target.Community), vList, target.TimeoutMs), ct),
+                try
+                {
+                    result = target.Version switch
+                    {
+                        SnmpVersion.V1 => await Task.Run(() =>
+                            Messenger.Get(VersionCode.V1, ep,
+                                new OctetString(target.Community), vList, target.TimeoutMs), ct),
 
-                SnmpVersion.V2c => await Task.Run(() =>
-                    Messenger.Get(VersionCode.V2, ep,
-                        new OctetString(target.Community), vList, target.TimeoutMs), ct),
+                        SnmpVersion.V2c => await Task.Run(() =>
+                            Messenger.Get(VersionCode.V2, ep,
+                                new OctetString(target.Community), vList, target.TimeoutMs), ct),
 
-                SnmpVersion.V3 => await GetV3Async(target, ep, vList, ct),
+                        SnmpVersion.V3 => await GetV3Async(target, ep, vList, ct),
 
-                _ => throw new NotSupportedException($"SNMP version {target.Version} not supported.")
-            };
+                        _ => throw new NotSupportedException($"SNMP version {target.Version} not supported.")
+                    };
 
-            var v = result.FirstOrDefault();
+                    // Success - break out of retry loop
+                    break;
+                }
+                catch (System.Net.Sockets.SocketException ex) when (attempt < target.Retries)
+                {
+                    lastException = ex;
+                    _log.Debug($"GET attempt {attempt + 1}/{target.Retries + 1} failed for {oid}: {ex.Message}, retrying...");
+                    await Task.Delay(100, ct); // Small delay before retry
+                }
+            }
+
+            // If all retries failed, throw the last exception
+            if (result == null && lastException != null)
+                throw lastException;
+
+            var v = result?.FirstOrDefault();
             if (v == null) return (null, "No variable returned.");
 
             var r = MapVariable(v);
@@ -84,24 +107,25 @@ public sealed class SnmpClient : ISnmpClient
         SnmpTarget target, IPEndPoint ep, ObjectIdentifier root,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var current = root;
-        while (!ct.IsCancellationRequested)
+        var results = new List<Variable>();
+
+        try
         {
-            IList<Variable> vars;
-            try
-            {
-                vars = await Task.Run(() =>
-                    Messenger.GetNext(VersionCode.V1, ep,
-                        new OctetString(target.Community),
-                        new List<Variable> { new(current) }, target.TimeoutMs), ct);
-            }
-            catch (Exception ex) { _log.Error("GETNEXT failed", ex.Message); yield break; }
+            await Task.Run(() =>
+                Messenger.Walk(VersionCode.V1, ep,
+                    new OctetString(target.Community),
+                    root, results, target.TimeoutMs,
+                    WalkMode.WithinSubtree), ct);
+        }
+        catch (Exception ex) 
+        { 
+            _log.Error("GETNEXT failed", ex.Message); 
+            yield break; 
+        }
 
-            var v = vars.FirstOrDefault();
-            if (v == null || v.Data is EndOfMibView) yield break;
-            if (!v.Id.ToString().StartsWith(root.ToString())) yield break;
-
-            current = v.Id;
+        foreach (var v in results)
+        {
+            ct.ThrowIfCancellationRequested();
             yield return MapVariable(v);
         }
     }
@@ -163,24 +187,53 @@ public sealed class SnmpClient : ISnmpClient
             // Log attempt WITHOUT secrets — community/credentials are NOT logged here.
             _log.Info($"SET attempt: OID={oid} Type={type} Value={value} Host={target.Host}");
 
-            if (target.Version == SnmpVersion.V3)
-            {
-                var discovery = Messenger.GetNextDiscovery(SnmpType.GetBulkRequestPdu);
-                var report    = await Task.Run(() => discovery.GetResponse(target.TimeoutMs, ep), ct);
-                var auth      = BuildV3Auth(target);
+            Exception? lastException = null;
 
-                await Task.Run(() =>
-                    Messenger.Set(VersionCode.V3, ep,
-                        new OctetString(target.SecurityName), vList, target.TimeoutMs,
-                        auth, report, new OctetString(target.ContextName)), ct);
-            }
-            else
+            // Retry logic for transient network errors
+            for (int attempt = 0; attempt <= target.Retries; attempt++)
             {
-                var comm = target.Version == SnmpVersion.V1 ? VersionCode.V1 : VersionCode.V2;
-                await Task.Run(() =>
-                    Messenger.Set(comm, ep,
-                        new OctetString(target.WriteCommunity), vList, target.TimeoutMs), ct);
+                try
+                {
+                    if (target.Version == SnmpVersion.V3)
+                    {
+                        var discovery = Messenger.GetNextDiscovery(SnmpType.SetRequestPdu);
+                        var report    = await Task.Run(() => discovery.GetResponse(target.TimeoutMs, ep), ct);
+                        var auth      = BuildV3Auth(target);
+
+                        var request = new SetRequestMessage(
+                            VersionCode.V3,
+                            Messenger.NextMessageId,
+                            Messenger.NextRequestId,
+                            new OctetString(target.SecurityName),
+                            vList,
+                            auth,
+                            Messenger.MaxMessageSize,
+                            report);
+
+                        await Task.Run(() => request.GetResponse(target.TimeoutMs, ep), ct);
+                    }
+                    else
+                    {
+                        var comm = target.Version == SnmpVersion.V1 ? VersionCode.V1 : VersionCode.V2;
+                        await Task.Run(() =>
+                            Messenger.Set(comm, ep,
+                                new OctetString(target.WriteCommunity), vList, target.TimeoutMs), ct);
+                    }
+
+                    // Success - break out of retry loop
+                    break;
+                }
+                catch (System.Net.Sockets.SocketException ex) when (attempt < target.Retries)
+                {
+                    lastException = ex;
+                    _log.Debug($"SET attempt {attempt + 1}/{target.Retries + 1} failed for {oid}: {ex.Message}, retrying...");
+                    await Task.Delay(100, ct); // Small delay before retry
+                }
             }
+
+            // If all retries failed, throw the last exception
+            if (lastException != null)
+                throw lastException;
 
             _log.Info($"SET succeeded: OID={oid}");
             return (true, null);
@@ -224,14 +277,22 @@ public sealed class SnmpClient : ISnmpClient
     private async Task<IList<Variable>> GetV3Async(
         SnmpTarget target, IPEndPoint ep, List<Variable> vList, CancellationToken ct)
     {
-        var discovery = Messenger.GetNextDiscovery(SnmpType.GetBulkRequestPdu);
+        var discovery = Messenger.GetNextDiscovery(SnmpType.GetRequestPdu);
         var report    = await Task.Run(() => discovery.GetResponse(target.TimeoutMs, ep), ct);
         var auth      = BuildV3Auth(target);
 
-        return await Task.Run(() =>
-            Messenger.Get(VersionCode.V3, ep,
-                new OctetString(target.SecurityName), vList, target.TimeoutMs,
-                auth, report, new OctetString(target.ContextName)), ct);
+        var request = new GetRequestMessage(
+            VersionCode.V3,
+            Messenger.NextMessageId,
+            Messenger.NextRequestId,
+            new OctetString(target.SecurityName),
+            vList,
+            auth,
+            Messenger.MaxMessageSize,
+            report);
+
+        var response = await Task.Run(() => request.GetResponse(target.TimeoutMs, ep), ct);
+        return response.Pdu().Variables;
     }
 
     /// <summary>

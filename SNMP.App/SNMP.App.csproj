@@ -13,7 +13,14 @@
     <Product>SNMP Studio</Product>
     <Company>Bennett Joseph</Company>
     <Copyright>Copyright © 2026 Bennett Joseph</Copyright>
-  </PropertyGroup>
+  </PropertyGroup># Stage all modified files
+git add -A
+
+# Commit with a message
+git commit -m "Your commit message here"
+
+# Push to remote
+git push
 
   <ItemGroup>
     <ProjectReference Include="..\SNMP.Core\SNMP.Core.csproj"/>

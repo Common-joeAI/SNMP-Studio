@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Lextm.SharpSnmpLib;
 using Lextm.SharpSnmpLib.Messaging;
+using Lextm.SharpSnmpLib.Security;
 using SNMP.Core.Interfaces;
 using SNMP.Core.Models;
 
@@ -84,7 +85,7 @@ public sealed class TrapReceiver : ITrapReceiver
             if (msg is TrapV1Message v1)
             {
                 entry.Enterprise  = v1.Enterprise.ToString();
-                entry.GenericType = v1.Generic;
+                entry.GenericType = (int)v1.Generic;
                 entry.TrapOid     = $"{v1.Enterprise}.{v1.Specific}";
                 foreach (var vb in v1.Variables())
                     entry.VarBinds.Add(MakeVarBind(vb));

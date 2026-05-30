@@ -19,6 +19,12 @@ public static class ErrorClassifier
         var inner = ex.InnerException?.Message.ToLowerInvariant() ?? "";
         var combined = msg + " " + inner;
 
+        // ── Socket / connection errors ────────────────────────────────────────
+        if (ex is System.Net.Sockets.SocketException)
+            return new(NegotiationResult.NoResponse,
+                "Connection error — the remote device closed the connection. Check device health, network connectivity, and firewall rules.",
+                $"SocketException: {ex.Message}");
+
         // ── Timeout / no response ────────────────────────────────────────────
         if (combined.Contains("timeout") || combined.Contains("timed out"))
             return new(NegotiationResult.Timeout,
