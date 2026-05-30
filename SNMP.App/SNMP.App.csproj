@@ -11,8 +11,8 @@
     <AssemblyVersion>1.1.0.0</AssemblyVersion>
     <FileVersion>1.1.0.0</FileVersion>
     <Product>SNMP Studio</Product>
-    <Company>Western Alliance Bank</Company>
-    <Copyright>Copyright © 2026 Western Alliance Bank. All rights reserved.</Copyright>
+    <Company>Bennett Joseph</Company>
+    <Copyright>Copyright © 2026 Bennett Joseph</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

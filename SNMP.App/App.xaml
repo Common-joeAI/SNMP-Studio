@@ -5,5 +5,6 @@
     <Application.Resources>
         <conv:BoolToVisibilityConverter  x:Key="BoolVis"/>
         <conv:NullToVisibilityConverter  x:Key="NullVis"/>
+        <conv:IntToVisibilityConverter   x:Key="IntVis"/>
     </Application.Resources>
 </Application>

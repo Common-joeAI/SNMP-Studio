@@ -434,7 +434,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Results.Clear(); FilteredResults.Clear(); Tables.Clear(); OidCount = 0;
         IsBusy = true; _cts = new CancellationTokenSource();
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var timer = new System.Timers.Timer(500);
+        using var timer = new System.Timers.Timer(500);
         timer.Elapsed += (_, _) => Elapsed = $"{sw.Elapsed:mm\\:ss}";
         timer.Start();
         StatusText = $"Walking {RootOid}…";

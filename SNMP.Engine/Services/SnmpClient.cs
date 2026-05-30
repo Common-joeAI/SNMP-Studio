@@ -26,7 +26,7 @@ public sealed class SnmpClient : ISnmpClient
     {
         try
         {
-            var ep = ResolveEndpoint(target);
+            var ep = await ResolveEndpointAsync(target).ConfigureAwait(false);
             var vList = new List<Variable> { new(new ObjectIdentifier(oid)) };
 
             IList<Variable> result = target.Version switch
@@ -64,7 +64,7 @@ public sealed class SnmpClient : ISnmpClient
         SnmpTarget target, string rootOid,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var ep = ResolveEndpoint(target);
+        var ep = await ResolveEndpointAsync(target).ConfigureAwait(false);
         var root = new ObjectIdentifier(rootOid);
 
         // For v1 we must use GETNEXT; for v2c/v3 GETBULK is far more efficient.
@@ -156,7 +156,7 @@ public sealed class SnmpClient : ISnmpClient
     {
         try
         {
-            var ep   = ResolveEndpoint(target);
+            var ep   = await ResolveEndpointAsync(target).ConfigureAwait(false);
             var data = BuildSnmpData(type, value);
             var vList = new List<Variable> { new(new ObjectIdentifier(oid), data) };
 
@@ -195,8 +195,13 @@ public sealed class SnmpClient : ISnmpClient
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static IPEndPoint ResolveEndpoint(SnmpTarget t) =>
-        new(Dns.GetHostAddresses(t.Host).First(), t.Port);
+    private static async Task<IPEndPoint> ResolveEndpointAsync(SnmpTarget t)
+    {
+        var addresses = await Dns.GetHostAddressesAsync(t.Host).ConfigureAwait(false);
+        if (addresses.Length == 0)
+            throw new InvalidOperationException($"DNS resolution returned no addresses for '{t.Host}'.");
+        return new IPEndPoint(addresses[0], t.Port);
+    }
 
     private static SnmpResult MapVariable(Variable v) => new()
     {

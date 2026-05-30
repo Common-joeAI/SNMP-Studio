@@ -47,3 +47,23 @@ public sealed class NullToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }
+/// <summary>
+/// Converts int → Visibility. Zero (or negative) = Collapsed, positive = Visible.
+/// ConverterParameter="Inverse" reverses this (zero→Visible, positive→Collapsed).
+/// Used for showing count-based chips only when count > 0.
+/// </summary>
+[ValueConversion(typeof(int), typeof(Visibility))]
+public sealed class IntToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var count  = value is int i ? i : 0;
+        var show   = count > 0;
+        var invert = parameter is string s && s.Equals("Inverse", StringComparison.OrdinalIgnoreCase);
+        if (invert) show = !show;
+        return show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}

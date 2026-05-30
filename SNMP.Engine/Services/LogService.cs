@@ -16,8 +16,14 @@ public sealed class LogService : ILogService
     public void Log(LogLevel level, string message, string? details = null)
     {
         var entry = new LogEntry { Level = level, Message = message, Details = details };
-        lock (_lock) _entries.Add(entry);
-        EntryAdded?.Invoke(entry);
+        Action<LogEntry>? handler;
+        lock (_lock)
+        {
+            _entries.Add(entry);
+            handler = EntryAdded;   // snapshot delegate inside lock
+        }
+        // Invoke outside lock to avoid deadlock if handler re-enters Log()
+        handler?.Invoke(entry);
     }
 
     public void Info(string msg, string? details = null)  => Log(LogLevel.Info,  msg, details);

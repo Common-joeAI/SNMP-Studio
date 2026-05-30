@@ -35,8 +35,11 @@ public sealed class NegotiationService : INegotiationService
         IPEndPoint ep;
         try
         {
-            ep = new IPEndPoint(Dns.GetHostAddresses(host).First(), port);
+            var addrs = await Dns.GetHostAddressesAsync(host, ct).ConfigureAwait(false);
+            if (addrs.Length == 0) throw new Exception("No addresses returned.");
+            ep = new IPEndPoint(addrs[0], port);
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             report.Result = NegotiationResult.NoResponse;
