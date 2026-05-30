@@ -1,0 +1,288 @@
+﻿using System.Net;
+using System.Runtime.CompilerServices;
+using System.Security;
+using Lextm.SharpSnmpLib;
+using Lextm.SharpSnmpLib.Messaging;
+using Lextm.SharpSnmpLib.Security;
+using SNMP.Core.Enums;
+using SNMP.Core.Interfaces;
+using SNMP.Core.Models;
+
+namespace SNMP.Engine.Services;
+
+/// <summary>
+/// Wraps SharpSnmpLib to provide async GET, WALK (GETNEXT/GETBULK), and SET operations.
+/// All secrets are consumed from SecureString and never stored as managed plain strings.
+/// </summary>
+public sealed class SnmpClient : ISnmpClient
+{
+    private readonly ILogService _log;
+
+    public SnmpClient(ILogService log) => _log = log;
+
+    // ── GET ─────────────────────────────────────────────────────────────────
+    public async Task<(SnmpResult? Result, string? Error)> GetAsync(
+        SnmpTarget target, string oid, CancellationToken ct = default)
+    {
+        try
+        {
+            var ep = await ResolveEndpointAsync(target).ConfigureAwait(false);
+            var vList = new List<Variable> { new(new ObjectIdentifier(oid)) };
+
+            IList<Variable> result = target.Version switch
+            {
+                SnmpVersion.V1 => await Task.Run(() =>
+                    Messenger.Get(VersionCode.V1, ep,
+                        new OctetString(target.Community), vList, target.TimeoutMs), ct),
+
+                SnmpVersion.V2c => await Task.Run(() =>
+                    Messenger.Get(VersionCode.V2, ep,
+                        new OctetString(target.Community), vList, target.TimeoutMs), ct),
+
+                SnmpVersion.V3 => await GetV3Async(target, ep, vList, ct),
+
+                _ => throw new NotSupportedException($"SNMP version {target.Version} not supported.")
+            };
+
+            var v = result.FirstOrDefault();
+            if (v == null) return (null, "No variable returned.");
+
+            var r = MapVariable(v);
+            _log.Debug($"GET {oid} = {r.RawValue}");
+            return (r, null);
+        }
+        catch (Exception ex)
+        {
+            var friendly = ErrorClassifier.Classify(ex);
+            _log.Error($"GET failed: {oid}", friendly.Details);
+            return (null, friendly.FriendlyMessage);
+        }
+    }
+
+    // ── WALK (GETBULK for v2c/v3, GETNEXT for v1) ───────────────────────────
+    public async IAsyncEnumerable<SnmpResult> WalkAsync(
+        SnmpTarget target, string rootOid,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var ep = await ResolveEndpointAsync(target).ConfigureAwait(false);
+        var root = new ObjectIdentifier(rootOid);
+
+        // For v1 we must use GETNEXT; for v2c/v3 GETBULK is far more efficient.
+        if (target.Version == SnmpVersion.V1)
+        {
+            await foreach (var r in WalkNextAsync(target, ep, root, ct))
+                yield return r;
+        }
+        else
+        {
+            await foreach (var r in WalkBulkAsync(target, ep, root, ct))
+                yield return r;
+        }
+    }
+
+    private async IAsyncEnumerable<SnmpResult> WalkNextAsync(
+        SnmpTarget target, IPEndPoint ep, ObjectIdentifier root,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var results = new List<Variable>();
+
+        try
+        {
+            await Task.Run(() =>
+                Messenger.Walk(VersionCode.V1, ep,
+                    new OctetString(target.Community),
+                    root, results, target.TimeoutMs,
+                    WalkMode.WithinSubtree), ct);
+        }
+        catch (Exception ex) 
+        { 
+            _log.Error("GETNEXT failed", ex.Message); 
+            yield break; 
+        }
+
+        foreach (var v in results)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return MapVariable(v);
+        }
+    }
+
+    private async IAsyncEnumerable<SnmpResult> WalkBulkAsync(
+        SnmpTarget target, IPEndPoint ep, ObjectIdentifier root,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var results = new List<Variable>();
+        var vCode = target.Version == SnmpVersion.V2c ? VersionCode.V2 : VersionCode.V3;
+
+        try
+        {
+            if (target.Version == SnmpVersion.V3)
+            {
+                // v3 BULK walk via discovery + user-based security
+                var discovery = Messenger.GetNextDiscovery(SnmpType.GetBulkRequestPdu);
+                var report    = await Task.Run(() => discovery.GetResponse(target.TimeoutMs, ep), ct);
+                var auth      = BuildV3Auth(target);
+
+                // Walk subtree — max-repetitions 10 per PDU
+                await Task.Run(() =>
+                    Messenger.BulkWalk(vCode, ep, new OctetString(target.SecurityName),
+                        new OctetString(target.ContextName), root, results, target.TimeoutMs,
+                        10, WalkMode.WithinSubtree, auth, report), ct);
+            }
+            else
+            {
+                await Task.Run(() =>
+                    Messenger.BulkWalk(vCode, ep, new OctetString(target.Community),
+                        OctetString.Empty, root, results, target.TimeoutMs,
+                        10, WalkMode.WithinSubtree, null, null), ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            var c = ErrorClassifier.Classify(ex);
+            _log.Error("BULKWALK failed", c.Details);
+            yield break;
+        }
+
+        foreach (var v in results)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return MapVariable(v);
+        }
+    }
+
+    // ── SET ──────────────────────────────────────────────────────────────────
+    public async Task<(bool Success, string? Error)> SetAsync(
+        SnmpTarget target, string oid, string type, string value, CancellationToken ct = default)
+    {
+        try
+        {
+            var ep   = await ResolveEndpointAsync(target).ConfigureAwait(false);
+            var data = BuildSnmpData(type, value);
+            var vList = new List<Variable> { new(new ObjectIdentifier(oid), data) };
+
+            // Log attempt WITHOUT secrets — community/credentials are NOT logged here.
+            _log.Info($"SET attempt: OID={oid} Type={type} Value={value} Host={target.Host}");
+
+            if (target.Version == SnmpVersion.V3)
+            {
+                var discovery = Messenger.GetNextDiscovery(SnmpType.SetRequestPdu);
+                var report    = await Task.Run(() => discovery.GetResponse(target.TimeoutMs, ep), ct);
+                var auth      = BuildV3Auth(target);
+
+                var request = new SetRequestMessage(
+                    VersionCode.V3,
+                    Messenger.NextMessageId,
+                    new OctetString(target.SecurityName),
+                    new OctetString(target.ContextName),
+                    vList,
+                    auth,
+                    Messenger.MaxMessageSize,
+                    report);
+
+                await Task.Run(() => request.GetResponse(target.TimeoutMs, ep), ct);
+            }
+            else
+            {
+                var comm = target.Version == SnmpVersion.V1 ? VersionCode.V1 : VersionCode.V2;
+                await Task.Run(() =>
+                    Messenger.Set(comm, ep,
+                        new OctetString(target.WriteCommunity), vList, target.TimeoutMs), ct);
+            }
+
+            _log.Info($"SET succeeded: OID={oid}");
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            var c = ErrorClassifier.Classify(ex);
+            _log.Error($"SET failed: {oid}", c.Details);
+            return (false, c.FriendlyMessage);
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static async Task<IPEndPoint> ResolveEndpointAsync(SnmpTarget t)
+    {
+        var addresses = await Dns.GetHostAddressesAsync(t.Host).ConfigureAwait(false);
+        if (addresses.Length == 0)
+            throw new InvalidOperationException($"DNS resolution returned no addresses for '{t.Host}'.");
+        return new IPEndPoint(addresses[0], t.Port);
+    }
+
+    private static SnmpResult MapVariable(Variable v) => new()
+    {
+        Oid      = v.Id.ToString(),
+        RawValue = v.Data.ToString() ?? string.Empty,
+        Type     = v.Data.TypeCode.ToString()
+    };
+
+    private static ISnmpData BuildSnmpData(string type, string value) => type.ToUpperInvariant() switch
+    {
+        "INTEGER" or "INT" => new Integer32(int.Parse(value)),
+        "STRING"  or "OCTETSTRING" => new OctetString(value),
+        "OID"     => new ObjectIdentifier(value),
+        "TIMETICKS" => new TimeTicks(uint.Parse(value)),
+        "GAUGE"   => new Gauge32(uint.Parse(value)),
+        "COUNTER" => new Counter32(uint.Parse(value)),
+        _         => new OctetString(value)
+    };
+
+    private async Task<IList<Variable>> GetV3Async(
+        SnmpTarget target, IPEndPoint ep, List<Variable> vList, CancellationToken ct)
+    {
+        var discovery = Messenger.GetNextDiscovery(SnmpType.GetRequestPdu);
+        var report    = await Task.Run(() => discovery.GetResponse(target.TimeoutMs, ep), ct);
+        var auth      = BuildV3Auth(target);
+
+        var request = new GetRequestMessage(
+            VersionCode.V3,
+            Messenger.NextMessageId,
+            new OctetString(target.SecurityName),
+            new OctetString(target.ContextName),
+            vList,
+            auth,
+            Messenger.MaxMessageSize,
+            report);
+
+        var response = await Task.Run(() => request.GetResponse(target.TimeoutMs, ep), ct);
+        return response.Pdu().Variables;
+    }
+
+    /// <summary>
+    /// Builds the SharpSnmpLib IPrivacyProvider from SecureString credentials.
+    /// Passwords are decrypted inline, used immediately, and references dropped.
+    /// </summary>
+    private static IPrivacyProvider BuildV3Auth(SnmpTarget t)
+    {
+        // Extract passwords from SecureString only long enough to build the auth object.
+        var authPwd = SecureStringToString(t.AuthPassword);
+        var privPwd = SecureStringToString(t.PrivPassword);
+
+        IAuthenticationProvider authProv = t.AuthProtocol switch
+        {
+            AuthProtocol.MD5    => new MD5AuthenticationProvider(new OctetString(authPwd ?? "")),
+            AuthProtocol.SHA1   => new SHA1AuthenticationProvider(new OctetString(authPwd ?? "")),
+            AuthProtocol.SHA256 => new SHA256AuthenticationProvider(new OctetString(authPwd ?? "")),
+            AuthProtocol.SHA512 => new SHA512AuthenticationProvider(new OctetString(authPwd ?? "")),
+            _                   => DefaultAuthenticationProvider.Instance
+        };
+
+        return t.PrivProtocol switch
+        {
+            PrivProtocol.DES    => new DESPrivacyProvider(new OctetString(privPwd ?? ""), authProv),
+            PrivProtocol.AES128 => new AESPrivacyProvider(new OctetString(privPwd ?? ""), authProv),
+            PrivProtocol.AES256 => new AES256PrivacyProvider(new OctetString(privPwd ?? ""), authProv),
+            _                   => new DefaultPrivacyProvider(authProv)
+        };
+    }
+
+    private static string? SecureStringToString(SecureString? ss)
+    {
+        if (ss == null) return null;
+        var ptr = System.Runtime.InteropServices.Marshal.SecureStringToGlobalAllocUnicode(ss);
+        try { return System.Runtime.InteropServices.Marshal.PtrToStringUni(ptr); }
+        finally { System.Runtime.InteropServices.Marshal.ZeroFreeGlobalAllocUnicode(ptr); }
+    }
+}

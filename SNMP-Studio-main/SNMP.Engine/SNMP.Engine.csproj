@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SNMP.Core\SNMP.Core.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Lextm.SharpSnmpLib — the only production-grade SNMP library with full .NET 8 support.
+      Provides GET, GETNEXT, GETBULK, SET, WALK, Trap receive, SNMPv1/v2c/v3.
+      Latest stable: 12.5.7  (12.5.2 → 12.5.7, patch-level bump, no breaking changes)
+    -->
+    <PackageReference Include="Lextm.SharpSnmpLib" Version="12.5.7"/>
+
+    <!--
+      System.Security.Cryptography.ProtectedData — provides ProtectedData.Protect / Unprotect
+      (DPAPI). NOT inbox on .NET Core / .NET 8 — requires this NuGet package.
+      Used by V3ProfileStore to encrypt SNMPv3 passwords at rest (CurrentUser scope).
+      Microsoft-owned package, ships with the .NET runtime team.  No third-party dependencies.
+    -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0"/>
+  </ItemGroup>
+</Project>

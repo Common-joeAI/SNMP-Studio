@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SNMP.Core\SNMP.Core.csproj"/>
+    <ProjectReference Include="..\SNMP.Engine\SNMP.Engine.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Microsoft.NET.Test.Sdk — Microsoft-owned test runner infrastructure.
+      Latest stable: 17.12.0
+    -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0"/>
+
+    <!--
+      xunit — staying on v2 (2.9.3) rather than jumping to v3 to avoid
+      template/runner breaking changes mid-project.
+      Latest v2 stable: 2.9.3
+    -->
+    <PackageReference Include="xunit" Version="2.9.3"/>
+
+    <!--
+      xunit.runner.visualstudio — enables VS Test Explorer integration.
+      Latest v2-compatible stable: 2.8.2
+    -->
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+
+    <!--
+      Moq — most widely used .NET mocking library.
+      v4.20.72 is the latest clean release (the SponsorLink data-harvesting
+      code was removed in 4.20.2+, 4.20.72 is safe).
+    -->
+    <PackageReference Include="Moq" Version="4.20.72"/>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "SQYjWN2cAVg=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.Engine\\SNMP.Engine.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\MSind\\.nuget\\packages\\lextm.sharpsnmplib\\12.5.7\\lextm.sharpsnmplib.12.5.7.nupkg.sha512",
+    "C:\\Users\\MSind\\.nuget\\packages\\system.security.cryptography.protecteddata\\8.0.0\\system.security.cryptography.protecteddata.8.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,30 @@
+SNMP Studio v1.0
+Proprietary Software — All Rights Reserved
+
+Copyright © 2026 Bennett Joseph. All rights reserved.
+
+Unauthorized use, reproduction, distribution, modification, or disclosure
+of this software or any portion thereof is strictly prohibited without
+express written permission from the author.
+
+---
+
+Third-Party Licenses
+
+Lextm.SharpSnmpLib
+  Copyright (c) Malcolm Crowe, Lex Li, and contributors
+  Licensed under the MIT License
+  https://github.com/lextm/sharpsnmplib/blob/master/LICENSE
+
+Microsoft.Extensions.DependencyInjection
+  Copyright (c) Microsoft Corporation
+  Licensed under the MIT License
+  https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+
+xunit
+  Copyright (c) .NET Foundation and contributors
+  Licensed under the Apache License, Version 2.0
+
+Moq
+  Copyright (c) Daniel Cazzulino and contributors
+  Licensed under the BSD 3-Clause License

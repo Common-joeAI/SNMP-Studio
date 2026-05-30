@@ -1,0 +1,97 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000003}|SNMP.App\\SNMP.App.csproj|c:\\users\\msind\\onedrive\\documents\\snmp-studio-main\\snmp-studio-main\\snmp.app\\app_new.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000003}|SNMP.App\\SNMP.App.csproj|solutionrelative:snmp.app\\app_new.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000003}|SNMP.App\\SNMP.App.csproj|c:\\users\\msind\\onedrive\\documents\\snmp-studio-main\\snmp-studio-main\\snmp.app\\styles\\darktheme.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000003}|SNMP.App\\SNMP.App.csproj|solutionrelative:snmp.app\\styles\\darktheme.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\MSind\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\700117061\\App.xaml||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000002}|SNMP.Engine\\SNMP.Engine.csproj|c:\\users\\msind\\onedrive\\documents\\snmp-studio-main\\snmp-studio-main\\snmp.engine\\services\\snmpclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000002}|SNMP.Engine\\SNMP.Engine.csproj|solutionrelative:snmp.engine\\services\\snmpclient.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000003}|SNMP.App\\SNMP.App.csproj|c:\\users\\msind\\onedrive\\documents\\snmp-studio-main\\snmp-studio-main\\snmp.app\\views\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{A1B2C3D4-0001-0001-0001-000000000003}|SNMP.App\\SNMP.App.csproj|solutionrelative:snmp.app\\views\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "App_New.xaml",
+              "DocumentMoniker": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.App\\App_New.xaml",
+              "RelativeDocumentMoniker": "SNMP.App\\App_New.xaml",
+              "ToolTip": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.App\\App_New.xaml",
+              "RelativeToolTip": "SNMP.App\\App_New.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-05-30T05:06:06.523Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "App.xaml",
+              "DocumentMoniker": "C:\\Users\\MSind\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\700117061\\App.xaml",
+              "RelativeDocumentMoniker": "..\\..\\..\\..\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\700117061\\App.xaml",
+              "ToolTip": "C:\\Users\\MSind\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\700117061\\App.xaml",
+              "RelativeToolTip": "..\\..\\..\\..\\AppData\\Local\\Temp\\CopilotBaseline\\Deleted\\700117061\\App.xaml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-05-30T05:05:57.743Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "DarkTheme.xaml",
+              "DocumentMoniker": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.App\\Styles\\DarkTheme.xaml",
+              "RelativeDocumentMoniker": "SNMP.App\\Styles\\DarkTheme.xaml",
+              "ToolTip": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.App\\Styles\\DarkTheme.xaml",
+              "RelativeToolTip": "SNMP.App\\Styles\\DarkTheme.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-05-30T05:05:38.599Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "SnmpClient.cs",
+              "DocumentMoniker": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.Engine\\Services\\SnmpClient.cs",
+              "RelativeDocumentMoniker": "SNMP.Engine\\Services\\SnmpClient.cs",
+              "ToolTip": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.Engine\\Services\\SnmpClient.cs",
+              "RelativeToolTip": "SNMP.Engine\\Services\\SnmpClient.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAAnwC4AAAAcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-30T04:58:36.314Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.App\\Views\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "SNMP.App\\Views\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\MSind\\OneDrive\\Documents\\SNMP-Studio-main\\SNMP-Studio-main\\SNMP.App\\Views\\MainWindow.xaml",
+              "RelativeToolTip": "SNMP.App\\Views\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-05-30T04:37:43.437Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+using SNMP.Core.Enums;
+
+namespace SNMP.Engine.Services;
+
+/// <summary>
+/// Converts raw SNMP/network exceptions into structured, user-friendly error descriptions.
+/// This keeps error handling DRY and surfaces actionable messages rather than stack traces.
+/// </summary>
+public static class ErrorClassifier
+{
+    public sealed record ClassifiedError(
+        NegotiationResult Category,
+        string FriendlyMessage,
+        string Details);
+
+    public static ClassifiedError Classify(Exception ex)
+    {
+        var msg = ex.Message.ToLowerInvariant();
+        var inner = ex.InnerException?.Message.ToLowerInvariant() ?? "";
+        var combined = msg + " " + inner;
+
+        // ── Socket / connection errors ────────────────────────────────────────
+        if (ex is System.Net.Sockets.SocketException)
+            return new(NegotiationResult.NoResponse,
+                "Connection error — the remote device closed the connection. Check device health, network connectivity, and firewall rules.",
+                $"SocketException: {ex.Message}");
+
+        // ── Timeout / no response ────────────────────────────────────────────
+        if (combined.Contains("timeout") || combined.Contains("timed out"))
+            return new(NegotiationResult.Timeout,
+                "Request timed out — the device did not respond within the configured timeout.",
+                $"Original: {ex.Message}");
+
+        if (combined.Contains("no data") || combined.Contains("connection refused")
+            || combined.Contains("unreachable") || combined.Contains("network is down"))
+            return new(NegotiationResult.NoResponse,
+                "No response from device — check the IP address and that SNMP is enabled.",
+                $"Original: {ex.Message}");
+
+        // ── Auth failures ─────────────────────────────────────────────────────
+        if (combined.Contains("unknown security name") || combined.Contains("unknownsecurityname"))
+            return new(NegotiationResult.AuthFailure,
+                "Unknown SNMPv3 security (user) name — verify the username matches the device configuration.",
+                $"Original: {ex.Message}");
+
+        if (combined.Contains("authentication failure") || combined.Contains("wrong digest")
+            || combined.Contains("invalid mac"))
+            return new(NegotiationResult.AuthFailure,
+                "SNMPv3 authentication failed — the auth password or protocol does not match.",
+                $"Original: {ex.Message}");
+
+        if (combined.Contains("decryption error") || combined.Contains("privacy")
+            || combined.Contains("priv"))
+            return new(NegotiationResult.AuthFailure,
+                "SNMPv3 privacy (encryption) failure — the priv password or protocol does not match.",
+                $"Original: {ex.Message}");
+
+        // ── Context mismatch ─────────────────────────────────────────────────
+        if (combined.Contains("context") || combined.Contains("no such context"))
+            return new(NegotiationResult.ContextMismatch,
+                "SNMPv3 context name mismatch — check the context name in the target settings.",
+                $"Original: {ex.Message}");
+
+        // ── Unsupported version ───────────────────────────────────────────────
+        if (combined.Contains("version") || combined.Contains("unsupported"))
+            return new(NegotiationResult.UnsupportedVersion,
+                "SNMP version not supported by this device — try a different version.",
+                $"Original: {ex.Message}");
+
+        // ── MIB / parse failure ───────────────────────────────────────────────
+        if (combined.Contains("parse") || combined.Contains("invalid oid")
+            || combined.Contains("object identifier"))
+            return new(NegotiationResult.Unknown,
+                "OID parse error — the OID format is invalid.",
+                $"Original: {ex.Message}");
+
+        // ── Generic fallback ──────────────────────────────────────────────────
+        return new(NegotiationResult.Unknown,
+            $"Unexpected error: {ex.GetType().Name} — {ex.Message}",
+            ex.ToString());
+    }
+}

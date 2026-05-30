@@ -1,0 +1,121 @@
+﻿using System.Net;
+using System.Net.Sockets;
+using Lextm.SharpSnmpLib;
+using Lextm.SharpSnmpLib.Messaging;
+using Lextm.SharpSnmpLib.Security;
+using SNMP.Core.Interfaces;
+using SNMP.Core.Models;
+
+namespace SNMP.Engine.Services;
+
+/// <summary>
+/// Listens for incoming SNMP v1/v2c traps on UDP (default port 162).
+/// Requires elevated privileges or a firewall rule allowing inbound UDP 162.
+/// Falls back gracefully if the port is unavailable.
+/// </summary>
+public sealed class TrapReceiver : ITrapReceiver
+{
+    private readonly IOidTranslator _translator;
+    private UdpClient?  _udp;
+    private CancellationTokenSource? _cts;
+
+    public event EventHandler<TrapEntry>? TrapReceived;
+    public bool IsListening { get; private set; }
+
+    public TrapReceiver(IOidTranslator translator)
+    {
+        _translator = translator;
+    }
+
+    public void Start(int port = 162)
+    {
+        if (IsListening) return;
+        try
+        {
+            _udp = new UdpClient(new IPEndPoint(IPAddress.Any, port));
+            IsListening = true;
+            _cts = new CancellationTokenSource();
+            _ = ListenLoopAsync(_cts.Token);
+        }
+        catch (SocketException ex)
+        {
+            throw new InvalidOperationException(
+                $"Cannot bind to UDP port {port}. Run as Administrator or use port > 1024. ({ex.Message})", ex);
+        }
+    }
+
+    public void Stop()
+    {
+        _cts?.Cancel();
+        _udp?.Close();
+        _udp?.Dispose();
+        _udp = null;
+        IsListening = false;
+    }
+
+    public void Dispose() => Stop();
+
+    private async Task ListenLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested && _udp != null)
+        {
+            try
+            {
+                var result = await _udp.ReceiveAsync(ct);
+                _ = Task.Run(() => ProcessDatagram(result.Buffer, result.RemoteEndPoint), ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch { /* ignore malformed datagrams */ }
+        }
+    }
+
+    private void ProcessDatagram(byte[] data, IPEndPoint remote)
+    {
+        try
+        {
+            var msg = MessageFactory.ParseMessages(data, new UserRegistry())[0];
+            var entry = new TrapEntry
+            {
+                SourceIp   = remote.Address.ToString(),
+                ReceivedAt = DateTime.Now,
+                Version    = msg.Version.ToString(),
+                Community  = msg is ISnmpMessage sm ? sm.Parameters.UserName.ToString() : string.Empty
+            };
+
+            if (msg is TrapV1Message v1)
+            {
+                entry.Enterprise  = v1.Enterprise.ToString();
+                entry.GenericType = (int)v1.Generic;
+                entry.TrapOid     = $"{v1.Enterprise}.{v1.Specific}";
+                foreach (var vb in v1.Variables())
+                    entry.VarBinds.Add(MakeVarBind(vb));
+            }
+            else if (msg is TrapV2Message v2)
+            {
+                var vars = v2.Variables().ToList();
+                var trapOidVb = vars.FirstOrDefault(v => v.Id.ToString() == "1.3.6.1.6.3.1.1.4.1.0");
+                entry.TrapOid = trapOidVb?.Data.ToString() ?? string.Empty;
+                var (name, _) = _translator.Translate(entry.TrapOid);
+                entry.TrapName = name;
+                foreach (var vb in vars.Skip(2))
+                    entry.VarBinds.Add(MakeVarBind(vb));
+            }
+
+            TrapReceived?.Invoke(this, entry);
+        }
+        catch { /* ignore unparseable packets */ }
+    }
+
+    private TrapVarBind MakeVarBind(Variable vb)
+    {
+        var oid = vb.Id.ToString();
+        var (name, _) = _translator.Translate(oid);
+        return new TrapVarBind
+        {
+            Oid          = oid,
+            SymbolicName = name,
+            Value        = vb.Data.ToString() ?? string.Empty,
+            Type         = vb.Data.GetType().Name
+        };
+    }
+}
