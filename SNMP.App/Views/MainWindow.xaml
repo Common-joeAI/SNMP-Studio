@@ -237,7 +237,7 @@
                     <TextBlock FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentBlue}">
                         SNMP<Run Foreground="{StaticResource TextPrimary}" FontWeight="Light"> Studio</Run>
                     </TextBlock>
-                    <TextBlock Text="v1.1  ·  Western Alliance Bank" FontSize="10"
+                    <TextBlock Text="v1.1" FontSize="10"
                                Foreground="{StaticResource TextMuted}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
