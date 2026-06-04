@@ -33,12 +33,16 @@ public sealed class NegotiationService : INegotiationService
         var communities = (communitiesToTry ?? DefaultCommunities).Distinct().ToList();
         NegotiationReport BuildCanceledReport()
         {
-            report.Success = false;
-            report.Result = NegotiationResult.Unknown;
-            report.FriendlyMessage = "Auto-negotiation was canceled.";
-            report.Details = "The operation was canceled before negotiation completed.";
+            var canceledReport = new NegotiationReport
+            {
+                Success = false,
+                Result = NegotiationResult.Unknown,
+                FriendlyMessage = "Auto-negotiation was canceled.",
+                Details = "The operation was canceled before negotiation completed.",
+                AttemptLog = [.. report.AttemptLog]
+            };
             _log.Info("Negotiation canceled.");
-            return report;
+            return canceledReport;
         }
 
         if (ct.IsCancellationRequested) return BuildCanceledReport();

@@ -50,7 +50,10 @@ public sealed class NullToVisibilityConverter : IValueConverter
         var invert = parameter is string s && s.Equals("Inverse", StringComparison.OrdinalIgnoreCase);
         var hasValue = invert ? !isVisible : isVisible;
 
-        return hasValue ? Binding.DoNothing : null;
+        if (targetType == typeof(bool) || targetType == typeof(bool?))
+            return hasValue;
+
+        return DependencyProperty.UnsetValue;
     }
 }
 /// <summary>
@@ -76,6 +79,12 @@ public sealed class IntToVisibilityConverter : IValueConverter
         var invert = parameter is string s && s.Equals("Inverse", StringComparison.OrdinalIgnoreCase);
         var show = invert ? !isVisible : isVisible;
 
-        return show ? 1 : 0;
+        if (targetType == typeof(int) || targetType == typeof(int?))
+            return show ? 1 : 0;
+
+        if (targetType == typeof(bool) || targetType == typeof(bool?))
+            return show;
+
+        return DependencyProperty.UnsetValue;
     }
 }
