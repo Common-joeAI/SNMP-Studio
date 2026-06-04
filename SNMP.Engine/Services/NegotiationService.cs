@@ -31,6 +31,17 @@ public sealed class NegotiationService : INegotiationService
     {
         var report = new NegotiationReport();
         var communities = (communitiesToTry ?? DefaultCommunities).Distinct().ToList();
+        NegotiationReport BuildCanceledReport()
+        {
+            report.Success = false;
+            report.Result = NegotiationResult.Unknown;
+            report.FriendlyMessage = "Auto-negotiation was canceled.";
+            report.Details = "The operation was canceled before negotiation completed.";
+            _log.Info("Negotiation canceled.");
+            return report;
+        }
+
+        if (ct.IsCancellationRequested) return BuildCanceledReport();
 
         IPEndPoint ep;
         try
@@ -39,7 +50,7 @@ public sealed class NegotiationService : INegotiationService
             if (addrs.Length == 0) throw new Exception("No addresses returned.");
             ep = new IPEndPoint(addrs[0], port);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException) { return BuildCanceledReport(); }
         catch (Exception ex)
         {
             report.Result = NegotiationResult.NoResponse;
@@ -54,7 +65,7 @@ public sealed class NegotiationService : INegotiationService
         // ── Phase 1: v2c ─────────────────────────────────────────────────────
         foreach (var comm in communities)
         {
-            ct.ThrowIfCancellationRequested();
+            if (ct.IsCancellationRequested) return BuildCanceledReport();
             var attempt = $"v2c community='{comm}'";
             report.AttemptLog.Add(attempt);
 
@@ -94,7 +105,7 @@ public sealed class NegotiationService : INegotiationService
         // ── Phase 2: v1 ──────────────────────────────────────────────────────
         foreach (var comm in communities)
         {
-            ct.ThrowIfCancellationRequested();
+            if (ct.IsCancellationRequested) return BuildCanceledReport();
             var attempt = $"v1 community='{comm}'";
             report.AttemptLog.Add(attempt);
 
@@ -121,6 +132,7 @@ public sealed class NegotiationService : INegotiationService
 
         // ── Phase 3: v3 noAuthNoPriv ──────────────────────────────────────────
         {
+            if (ct.IsCancellationRequested) return BuildCanceledReport();
             var attempt = "v3 noAuthNoPriv";
             report.AttemptLog.Add(attempt);
             try

@@ -45,7 +45,13 @@ public sealed class NullToVisibilityConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => throw new NotImplementedException();
+    {
+        var isVisible = value is Visibility visibility && visibility == Visibility.Visible;
+        var invert = parameter is string s && s.Equals("Inverse", StringComparison.OrdinalIgnoreCase);
+        var hasValue = invert ? !isVisible : isVisible;
+
+        return hasValue ? Binding.DoNothing : null;
+    }
 }
 /// <summary>
 /// Converts int → Visibility. Zero (or negative) = Collapsed, positive = Visible.
@@ -65,5 +71,11 @@ public sealed class IntToVisibilityConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => throw new NotImplementedException();
+    {
+        var isVisible = value is Visibility visibility && visibility == Visibility.Visible;
+        var invert = parameter is string s && s.Equals("Inverse", StringComparison.OrdinalIgnoreCase);
+        var show = invert ? !isVisible : isVisible;
+
+        return show ? 1 : 0;
+    }
 }
